@@ -916,13 +916,19 @@
     const ADMIN_PIN = "123456";
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwhHGVQ3RpgCx6FIosopNHO6uE3UAh6BGOFOxd6Eo65levqmbqeLi_oDAqu-Aqbbx1_Xw/exec";
 
-    let currentUser = null, currentPos = null, db;
+    let currentUser = null, currentPos = null, appDb, userDb;
     let currentFilter = 'daily', rangeStartDate = null, rangeEndDate = null;
     let pendingClockInData = null, currentPage = 'home';
     let cachedTransactions = [], cachedAttendance = [];
     const SYNC_INTERVAL = 30000;
     const SESSION_STORAGE_PREFIX = 'rocky_session_';
+    const APP_DB_NAME = 'AttendancePOSDB';
+    const APP_DB_VERSION = 1;
+    const USER_DB_PREFIX = 'AttendancePOSDB_USER_';
+    const USER_DB_VERSION = 1;
 
+    const sanitizeUsernameForDb = username => String(username || '').trim().toLowerCase().replace(/[^a-z0-9_-]/gi, '_');
+    const getUserDbName = username => `${USER_DB_PREFIX}${sanitizeUsernameForDb(username)}`;
     const getSessionKey = key => currentUser ? `${SESSION_STORAGE_PREFIX}${currentUser.username}_${key}` : `${SESSION_STORAGE_PREFIX}guest_${key}`;
     const getStoredCurrentUser = () => localStorage.getItem('current_user');
     const setStoredCurrentUser = value => localStorage.setItem('current_user', value);
@@ -981,23 +987,77 @@
 
     // ── DB ──
     const initDB = () => new Promise((res,rej) => {
-        const r = indexedDB.open("AttendancePOSDB",31);
-        r.onupgradeneeded = e => { db=e.target.result; if(!db.objectStoreNames.contains("users")) db.createObjectStore("users",{keyPath:"username"}); if(!db.objectStoreNames.contains("attendance")) db.createObjectStore("attendance",{keyPath:"id",autoIncrement:true}); if(!db.objectStoreNames.contains("transactions")) db.createObjectStore("transactions",{keyPath:"id"}); };
-        r.onsuccess = e => { db=e.target.result; res(); };
+        const r = indexedDB.open(APP_DB_NAME, APP_DB_VERSION);
+        r.onupgradeneeded = e => {
+            appDb = e.target.result;
+            if(!appDb.objectStoreNames.contains("users")) appDb.createObjectStore("users",{keyPath:"username"});
+        };
+        r.onsuccess = e => { appDb = e.target.result; res(); };
         r.onerror = e => rej(e);
     });
+    const initUserDB = username => new Promise((res,rej) => {
+        const dbName = getUserDbName(username);
+        if (userDb && userDb.name === dbName) return res();
+        if (userDb) {
+            try { userDb.close(); } catch (e) {}
+            userDb = null;
+        }
+        const r = indexedDB.open(dbName, USER_DB_VERSION);
+        r.onupgradeneeded = e => {
+            userDb = e.target.result;
+            if(!userDb.objectStoreNames.contains("attendance")) userDb.createObjectStore("attendance",{keyPath:"id",autoIncrement:true});
+            if(!userDb.objectStoreNames.contains("transactions")) userDb.createObjectStore("transactions",{keyPath:"id"});
+        };
+        r.onsuccess = e => { userDb = e.target.result; res(); };
+        r.onerror = e => rej(e);
+    });
+    const closeUserDB = () => {
+        if (userDb) {
+            try { userDb.close(); } catch (e) {}
+            userDb = null;
+        }
+    };
+    const deleteDatabaseByName = dbName => new Promise(resolve => {
+        try {
+            const req = indexedDB.deleteDatabase(dbName);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => resolve(false);
+            req.onblocked = () => resolve(false);
+        } catch (e) { resolve(false); }
+    });
+    const deleteAllRockyDatabases = async () => {
+        closeUserDB();
+        if (appDb) {
+            try { appDb.close(); } catch (e) {}
+            appDb = null;
+        }
+        if (indexedDB.databases) {
+            try {
+                const dbs = await indexedDB.databases();
+                const targets = dbs
+                    .map(item => item && item.name)
+                    .filter(name => name && (name === APP_DB_NAME || name.startsWith(USER_DB_PREFIX)));
+                for (const name of targets) await deleteDatabaseByName(name);
+                return;
+            } catch (e) {}
+        }
+        await deleteDatabaseByName(APP_DB_NAME);
+    };
     const dbAction = (store,method,data=null) => new Promise((res,rej) => {
-        const tx=db.transaction(store,"readwrite"),s=tx.objectStore(store);
+        const targetDb = store === 'users' ? appDb : userDb;
+        if (!targetDb) return rej(new Error(`Database untuk store ${store} belum siap`));
+        const tx=targetDb.transaction(store,"readwrite"),s=tx.objectStore(store);
         let r;
         if(method==='add') r=s.add(data); else if(method==='get') r=s.get(data); else if(method==='put') r=s.put(data); else if(method==='getAll') r=s.getAll(); else if(method==='delete') r=s.delete(data); else if(method==='clear') r=s.clear();
+        else return rej(new Error('Metode DB tidak dikenal'));
         r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
     });
 
     // ── CACHE ──
     const loadCache = async () => {
         if(!currentUser) return;
-        const at=await dbAction('transactions','getAll'); cachedTransactions=at.filter(t=>t.user===currentUser.username);
-        const aa=await dbAction('attendance','getAll'); cachedAttendance=aa.filter(a=>a.user===currentUser.username);
+        const at=await dbAction('transactions','getAll'); cachedTransactions=at.sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+        const aa=await dbAction('attendance','getAll'); cachedAttendance=aa.sort((a,b)=>(b.time||'').localeCompare(a.time||''));
         const td=getTodayWIB(),has=cachedAttendance.some(a=>extractDateFromTime(a.time)===td);
         setAttendanceState({ hasClockedIn: has, lastDate: has ? td : null });
     };
@@ -1018,7 +1078,7 @@
             const r=await fetch(`${GAS_WEB_APP_URL}?action=get&type=transactions&user=${currentUser.username}&t=${Date.now()}`);
             const d=await r.json();
             if(d?.success&&d.data){
-                const old=await dbAction('transactions','getAll'); for(const l of old) if(l.user===currentUser.username) await dbAction('transactions','delete',l.id);
+                await dbAction('transactions','clear');
                 for(const t of d.data) if(t.user===currentUser.username) await dbAction('transactions','add',{id:t.id,user:t.user,name:t.name,amount:t.amount,note:t.note,time:t.time,serverId:t.id});
             }
             await syncAttendanceFromServer(false); await loadCache(); refreshCurrentPage();
@@ -1031,7 +1091,7 @@
             const r=await fetch(`${GAS_WEB_APP_URL}?action=get&type=attendance&user=${currentUser.username}&t=${Date.now()}`);
             const d=await r.json();
             if(d?.success&&d.data&&d.data.length>0){
-                const al=await dbAction('attendance','getAll'); for(const l of al) if(l.user===currentUser.username) await dbAction('attendance','delete',l.id);
+                await dbAction('attendance','clear');
                 for(const a of d.data){
                     let t=a.time;
                     if(t&&(t.includes('T')||t.includes('Z'))){ const u=new Date(t); t=new Date(u.getTime()+7*3600000).toISOString().replace('T',' ').slice(0,19); }
@@ -1329,7 +1389,7 @@
         if(!confirm("⚠️ Ini akan menghapus data lokal & mengambil ulang dari server.\nLanjutkan?")) return;
         setLoading(true);
         try {
-            const all=await dbAction('transactions','getAll'); for(const t of all) if(t.user===currentUser.username) await dbAction('transactions','delete',t.id);
+            await dbAction('transactions','clear');
             await syncFromServer(true); showToast("✓ Resync berhasil!"); await renderHistory();
         } catch(e){ showToast("Gagal resync",true); }
         setLoading(false);
@@ -1378,6 +1438,7 @@
             if(ud&&ud.pin===p){
                 await clearAppSession(false);
                 currentUser=ud;
+                await initUserDB(ud.username);
                 setStoredCurrentUser(JSON.stringify({username:ud.username,pin:ud.pin}));
                 resetDailyAttendanceState();
                 await loadCache();
@@ -1563,8 +1624,7 @@
             clearLegacyAttendanceFlags();
             localStorage.removeItem('current_user');
             sessionStorage.clear();
-            indexedDB.deleteDatabase("AttendancePOSDB");
-            showToast("Reset berhasil!"); setTimeout(()=>location.reload(),1500);
+            deleteAllRockyDatabases().then(()=>{ showToast("Reset berhasil!"); setTimeout(()=>location.reload(),1500); });
         } else { showToast("Password salah!",true); closeResetModal(); }
     };
     const showImportModal = () => { const e=document.getElementById('import-modal'); e.classList.add('show'); e.style.display='flex'; document.getElementById('import-data').value=''; };
@@ -1624,6 +1684,7 @@
         clearLegacyAttendanceFlags();
         if (activeUsername) clearAttendanceStateForUser(activeUsername);
         sessionStorage.clear();
+        closeUserDB();
         if (clearCaches) {
             try {
                 if ('caches' in window) {
@@ -1639,6 +1700,7 @@
             setLoading(true);
             const loggedOutName = currentUser?.name || '';
             await clearAppSession(true);
+            closeUserDB();
             currentUser=null;
             currentPos=null;
             cachedTransactions=[];
@@ -1658,6 +1720,7 @@
                 const ud=JSON.parse(sv),v=await dbAction('users','get',ud.username);
                 if(v&&v.pin===ud.pin){
                     currentUser=v;
+                    await initUserDB(v.username);
                     resetDailyAttendanceState();
                     await loadCache();
                     if(navigator.onLine) await syncFromServer(false);
