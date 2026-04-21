@@ -1,1 +1,473 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rocky Hijab — Staff Simple</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --line:#e7ebf3;
+      --text:#111827;
+      --muted:#6b7280;
+      --primary:#2563eb;
+      --primary-soft:#eff6ff;
+      --green:#059669;
+      --green-soft:#ecfdf5;
+      --red:#dc2626;
+      --red-soft:#fef2f2;
+      --amber:#d97706;
+      --amber-soft:#fffbeb;
+      --shadow:0 8px 30px rgba(15,23,42,.06);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text)}
+    #app{max-width:430px;margin:0 auto;min-height:100vh;padding-bottom:90px}
+    .top{padding:22px 16px 14px}
+    .title{font-size:24px;font-weight:800;letter-spacing:-.03em}
+    .sub{font-size:13px;color:var(--muted);margin-top:4px}
+    .section{padding:0 16px 14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+    .hero{padding:18px}
+    .mono{font-family:'JetBrains Mono',monospace}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .mini{padding:14px}
+    .mini .lbl{font-size:11px;color:var(--muted);margin-bottom:8px}
+    .mini .num{font-size:18px;font-weight:800;line-height:1.2}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:700}
+    .ok{background:var(--green-soft);color:var(--green)}
+    .warn{background:var(--amber-soft);color:var(--amber)}
+    .danger{background:var(--red-soft);color:var(--red)}
+    .btn{border:none;border-radius:14px;padding:14px 16px;font-weight:700;font-family:Inter,sans-serif;cursor:pointer}
+    .btn-primary{background:var(--primary);color:#fff;width:100%}
+    .btn-soft{background:var(--primary-soft);color:var(--primary);width:100%}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .row{display:flex;gap:10px}
+    .input{width:100%;border:1px solid var(--line);background:#fff;border-radius:14px;padding:13px 14px;font-size:14px;outline:none}
+    .input:focus{border-color:#bfd4ff;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+    .amount{font-size:30px;font-weight:800;text-align:right;border:none;outline:none;width:100%;background:transparent;color:var(--primary);font-family:'JetBrains Mono',monospace}
+    .list{display:flex;flex-direction:column;gap:10px}
+    .item{padding:14px 14px;border:1px solid var(--line);border-radius:16px;background:#fff}
+    .item-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .item-title{font-size:14px;font-weight:700}
+    .item-meta{font-size:12px;color:var(--muted);margin-top:4px}
+    .item-amt{font-size:15px;font-weight:800}
+    .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:rgba(255,255,255,.92);backdrop-filter:blur(18px);border-top:1px solid var(--line);display:flex;z-index:20}
+    .tab{flex:1;background:none;border:none;padding:12px 8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer}
+    .tab.active{color:var(--primary)}
+    .hidden{display:none!important}
+    .sp12{height:12px}
+    .sp8{height:8px}
+    .page-title{font-size:18px;font-weight:800;margin-bottom:4px}
+    .page-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
+    .empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px}
+    #loadingOverlay{position:fixed;inset:0;background:#f5f7fb;display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .35s ease, visibility .35s ease}
+    #loadingOverlay.hide{opacity:0;visibility:hidden}
+    .loader-box{text-align:center}
+    .spinner{width:44px;height:44px;border:4px solid #dbe5f5;border-top-color:var(--primary);border-radius:50%;margin:0 auto 12px;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .muted{color:var(--muted)}
+    .right{text-align:right}
+    .divider{height:1px;background:var(--line);margin:14px 0}
+  </style>
+</head>
+<body>
+<div id="loadingOverlay">
+  <div class="loader-box">
+    <div class="spinner"></div>
+    <div style="font-weight:800">Memuat aplikasi</div>
+    <div class="sub">Menyiapkan data staff...</div>
+  </div>
+</div>
 
+<div id="app">
+  <div id="page-content"></div>
+  <nav class="tabs hidden" id="bottom-nav">
+    <button class="tab active" id="tab-home" onclick="router.navigate('home')">Home</button>
+    <button class="tab" id="tab-pos" onclick="router.navigate('pos')">Transaksi</button>
+    <button class="tab" id="tab-history" onclick="router.navigate('history')">Riwayat</button>
+    <button class="tab" id="tab-report" onclick="router.navigate('report')">Laporan</button>
+  </nav>
+</div>
+
+<script>
+const ADMIN_WA = "6281514696906";
+const OFFICE_LOC = { lat: -6.786168, lng: 106.780918 };
+const RADIUS_LIMIT = 200;
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwhHGVQ3RpgCx6FIosopNHO6uE3UAh6BGOFOxd6Eo65levqmbqeLi_oDAqu-Aqbbx1_Xw/exec";
+const BONUS_RATE = 0.02;
+const SYNC_INTERVAL = 30000;
+
+let currentUser = null, currentPos = null, db = null, currentPage = 'login';
+let cachedTransactions = [], cachedAttendance = [];
+let syncIntervalId = null;
+
+function getWIBNowDate(){ return new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Jakarta'})); }
+function getWIBForSheet(){
+  const d = getWIBNowDate();
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0');
+  const h=String(d.getHours()).padStart(2,'0'),mi=String(d.getMinutes()).padStart(2,'0'),s=String(d.getSeconds()).padStart(2,'0');
+  return `${y}-${m}-${da} ${h}:${mi}:${s}`;
+}
+function getTodayWIB(){ return getWIBForSheet().slice(0,10); }
+function getYesterdayWIB(){ const d=getWIBNowDate(); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function extractDateFromTime(t){ return (t||'').slice(0,10); }
+function extractClock(t){ return (t||'').slice(11,16) || '-'; }
+function formatRupiah(n){ return 'Rp ' + new Intl.NumberFormat('id-ID').format(Number(n||0)); }
+function monthKey(t){ return (t||'').slice(0,7); }
+function getMonthName(monthIndex){ return ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][monthIndex]; }
+function getCurrentMonthLabel(){ const d=getWIBNowDate(); return `${getMonthName(d.getMonth())} ${d.getFullYear()}`; }
+function showToast(msg){ alert(msg); }
+
+function setNav(page){ ['home','pos','history','report'].forEach(p=>document.getElementById('tab-'+p)?.classList.toggle('active',p===page)); }
+
+const initDB = () => new Promise((resolve, reject) => {
+  const req = indexedDB.open('AttendancePOSDBSimple', 1);
+  req.onupgradeneeded = e => {
+    const db = e.target.result;
+    if (!db.objectStoreNames.contains('users')) db.createObjectStore('users', { keyPath: 'username' });
+    if (!db.objectStoreNames.contains('attendance')) db.createObjectStore('attendance', { keyPath: 'id' });
+    if (!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', { keyPath: 'id' });
+  };
+  req.onsuccess = e => { db = e.target.result; resolve(); };
+  req.onerror = e => reject(e);
+});
+
+const dbAction = (store, method, data = null) => new Promise((resolve, reject) => {
+  const tx = db.transaction(store, 'readwrite');
+  const s = tx.objectStore(store);
+  let r;
+  if (method === 'get') r = s.get(data);
+  else if (method === 'put') r = s.put(data);
+  else if (method === 'add') r = s.add(data);
+  else if (method === 'getAll') r = s.getAll();
+  else if (method === 'delete') r = s.delete(data);
+  else if (method === 'clear') r = s.clear();
+  r.onsuccess = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+});
+
+async function loadCache(){
+  if(!currentUser) return;
+  const trx = await dbAction('transactions','getAll');
+  cachedTransactions = trx.filter(x=>x.user===currentUser.username).sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+  const att = await dbAction('attendance','getAll');
+  cachedAttendance = att.filter(x=>x.user===currentUser.username).sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+}
+
+async function syncToServer(type,payload){
+  if(!navigator.onLine) return;
+  try{
+    await fetch(GAS_WEB_APP_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,payload,user:currentUser?.username||'',timestamp:getWIBForSheet()})});
+  }catch(e){}
+}
+
+async function syncFromServer(){
+  if(!currentUser || !navigator.onLine) return;
+  try{
+    const [rt,ra] = await Promise.all([
+      fetch(`${GAS_WEB_APP_URL}?action=get&type=transactions&user=${encodeURIComponent(currentUser.username)}&t=${Date.now()}`),
+      fetch(`${GAS_WEB_APP_URL}?action=get&type=attendance&user=${encodeURIComponent(currentUser.username)}&t=${Date.now()}`)
+    ]);
+    const [dt,da] = await Promise.all([rt.json(),ra.json()]);
+
+    if(dt.success && Array.isArray(dt.data)){
+      const old = await dbAction('transactions','getAll');
+      for(const x of old) if(x.user===currentUser.username) await dbAction('transactions','delete',x.id);
+      for(const t of dt.data){ await dbAction('transactions','put',t); }
+    }
+    if(da.success && Array.isArray(da.data)){
+      const old = await dbAction('attendance','getAll');
+      for(const x of old) if(x.user===currentUser.username) await dbAction('attendance','delete',x.id);
+      for(const a of da.data){ await dbAction('attendance','put',a); }
+    }
+    await loadCache();
+    refreshPage();
+  }catch(e){}
+}
+
+function startAutoSync(){ if(syncIntervalId) clearInterval(syncIntervalId); syncIntervalId=setInterval(syncFromServer,SYNC_INTERVAL); }
+function calculateDistance(la1,lo1,la2,lo2){const R=6371e3,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180,a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function isClockedInToday(){ return cachedAttendance.some(a=>extractDateFromTime(a.time)===getTodayWIB()); }
+function getTodayAttendance(){ return cachedAttendance.find(a=>extractDateFromTime(a.time)===getTodayWIB()) || null; }
+function getTodayRevenue(){ return cachedTransactions.filter(t=>extractDateFromTime(t.time)===getTodayWIB()).reduce((s,t)=>s+Number(t.amount||0),0); }
+function getYesterdayCount(){ return cachedTransactions.filter(t=>extractDateFromTime(t.time)===getYesterdayWIB()).length; }
+function getMonthlyRevenue(){ const key=getTodayWIB().slice(0,7); return cachedTransactions.filter(t=>monthKey(t.time)===key).reduce((s,t)=>s+Number(t.amount||0),0); }
+function getMonthlyBonus(){ return getMonthlyRevenue()*BONUS_RATE; }
+function getMonthStats(){
+  const now=getWIBNowDate();
+  const y=now.getFullYear(), m=now.getMonth();
+  const today=now.getDate();
+  const presentDays = new Set(cachedAttendance.filter(a=>{ const d=extractDateFromTime(a.time); return d.startsWith(`${y}-${String(m+1).padStart(2,'0')}`); }).map(a=>extractDateFromTime(a.time)));
+  return { hadir: presentDays.size, tidakHadir: Math.max(0, today - presentDays.size) };
+}
+
+async function handleLogin(){
+  const username=document.getElementById('login-user').value.trim();
+  const pin=document.getElementById('login-pin').value.trim();
+  if(!username||!pin) return showToast('Isi username dan PIN');
+  let user = await dbAction('users','get',username);
+  if(navigator.onLine){
+    try{
+      const r = await fetch(`${GAS_WEB_APP_URL}?action=get&type=users&userId=${encodeURIComponent(username)}&t=${Date.now()}`);
+      const d = await r.json();
+      if(d.success && d.data && d.data[0]){ await dbAction('users','put',d.data[0]); user=d.data[0]; }
+    }catch(e){}
+  }
+  if(user && String(user.pin)===pin){
+    currentUser=user;
+    localStorage.setItem('current_user_simple', JSON.stringify({username:user.username,pin:user.pin}));
+    document.getElementById('bottom-nav').classList.remove('hidden');
+    await loadCache();
+    await syncFromServer();
+    startAutoSync();
+    router.navigate('home');
+  }else showToast('Username/PIN salah');
+}
+
+async function checkSession(){
+  const s=localStorage.getItem('current_user_simple');
+  if(!s) return false;
+  try{
+    const parsed=JSON.parse(s);
+    const user = await dbAction('users','get',parsed.username);
+    if(user && String(user.pin)===String(parsed.pin)){ currentUser=user; return true; }
+  }catch(e){}
+  return false;
+}
+
+function logout(){
+  localStorage.removeItem('current_user_simple');
+  currentUser=null; cachedTransactions=[]; cachedAttendance=[];
+  document.getElementById('bottom-nav').classList.add('hidden');
+  router.navigate('login');
+}
+
+async function updateLocationChip(){
+  const el=document.getElementById('loc-status');
+  if(!el) return;
+  el.innerHTML = '<span class="badge warn">Mencari lokasi...</span>';
+  if(!navigator.geolocation){ el.innerHTML='<span class="badge danger">GPS tidak didukung</span>'; return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    currentPos={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    const dist = calculateDistance(currentPos.lat,currentPos.lng,OFFICE_LOC.lat,OFFICE_LOC.lng);
+    el.innerHTML = dist<=RADIUS_LIMIT
+      ? `<span class="badge ok">Dalam radius • ${Math.round(dist)}m</span>`
+      : `<span class="badge danger">Di luar radius • ${Math.round(dist)}m</span>`;
+  },()=>{ el.innerHTML='<span class="badge danger">Lokasi gagal diambil</span>'; });
+}
+
+async function handleClockIn(){
+  if(isClockedInToday()) return showToast('Sudah absen hari ini');
+  if(!currentPos) return showToast('Tunggu lokasi aktif');
+  const dist=calculateDistance(currentPos.lat,currentPos.lng,OFFICE_LOC.lat,OFFICE_LOC.lng);
+  if(dist>RADIUS_LIMIT) return showToast('Di luar radius kantor');
+  const data={ id:Date.now()+'_'+Math.random().toString(36).slice(2,6), user:currentUser.username,name:currentUser.name,time:getWIBForSheet(),loc:currentPos };
+  await dbAction('attendance','put',data);
+  cachedAttendance.unshift(data);
+  syncToServer('attendance',data);
+  refreshPage();
+  showToast('Absen berhasil');
+}
+
+async function handleTransaction(){
+  if(!isClockedInToday()) return showToast('Absen dulu sebelum transaksi');
+  const note=(document.getElementById('pos-note').value||'').trim();
+  const amount=Number(document.getElementById('pos-amount').dataset.numeric||0);
+  if(amount<=0) return showToast('Nominal belum benar');
+  const trx={id:Date.now()+'_'+Math.random().toString(36).slice(2,6),user:currentUser.username,name:currentUser.name,amount,note:note||'Transaksi',time:getWIBForSheet()};
+  await dbAction('transactions','put',trx);
+  cachedTransactions.unshift(trx);
+  syncToServer('transaction',trx);
+  document.getElementById('pos-note').value='';
+  const ai=document.getElementById('pos-amount'); ai.value=''; ai.dataset.numeric='0';
+  refreshPage();
+  showToast('Transaksi disimpan');
+}
+
+function sendTodayReport(){
+  const today = getTodayWIB();
+  const todayTrx = cachedTransactions.filter(t=>extractDateFromTime(t.time)===today);
+  const omzet = todayTrx.reduce((s,t)=>s+Number(t.amount||0),0);
+  const att = getTodayAttendance();
+  const msg = `LAPORAN STAFF\nNama: ${currentUser.name}\nTanggal: ${today}\nAbsen: ${att ? 'Ya, jam '+extractClock(att.time) : 'Belum'}\nPendapatan hari ini: ${formatRupiah(omzet)}\nJumlah transaksi: ${todayTrx.length}\nBonus bulan ini: ${formatRupiah(getMonthlyBonus())}`;
+  window.open(`https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function bindAmountInput(){
+  const ai=document.getElementById('pos-amount');
+  if(!ai) return;
+  ai.dataset.numeric='0';
+  ai.addEventListener('input',function(){
+    const raw=this.value.replace(/\D/g,'');
+    this.dataset.numeric=raw||'0';
+    this.value=raw?new Intl.NumberFormat('id-ID').format(Number(raw)):'';
+  });
+}
+
+function summaryCardsHTML(){
+  const att=getTodayAttendance();
+  return `
+    <div class="grid">
+      <div class="card mini"><div class="lbl">Pendapatan hari ini</div><div class="num mono">${formatRupiah(getTodayRevenue())}</div></div>
+      <div class="card mini"><div class="lbl">Transaksi kemarin</div><div class="num mono">${getYesterdayCount()}</div></div>
+      <div class="card mini"><div class="lbl">Bonus bulan ini (2%)</div><div class="num mono">${formatRupiah(getMonthlyBonus())}</div></div>
+      <div class="card mini"><div class="lbl">Absen hari ini</div><div class="num">${att ? extractClock(att.time) : 'Belum'}</div></div>
+    </div>`;
+}
+
+function homePage(){
+  const att=getTodayAttendance();
+  return `
+    <div class="top">
+      <div class="title">Halo, ${currentUser.name}</div>
+      <div class="sub">Staff panel yang lebih simple dan ringan</div>
+    </div>
+    <div class="section">
+      <div class="card hero">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:var(--muted)">Status hari ini</div>
+            <div style="font-size:22px;font-weight:800;margin-top:4px">${att ? 'Sudah Absen' : 'Belum Absen'}</div>
+            <div class="sub">${att ? 'Jam masuk ' + extractClock(att.time) : 'Silakan absen sebelum transaksi'}</div>
+          </div>
+          <div id="loc-status"><span class="badge warn">Mencari lokasi...</span></div>
+        </div>
+        <div class="sp12"></div>
+        <button class="btn btn-primary" onclick="handleClockIn()" ${att ? 'disabled' : ''}>${att ? 'Absen sudah tercatat' : 'Absen Sekarang'}</button>
+      </div>
+    </div>
+    <div class="section">${summaryCardsHTML()}</div>
+    <div class="section">
+      <div class="card hero">
+        <div class="page-title">Ringkasan cepat</div>
+        <div class="page-sub">Bonus otomatis 2% dari omzet bulan berjalan dan reset saat ganti bulan.</div>
+        <button class="btn btn-soft" onclick="router.navigate('report')">Lihat Laporan</button>
+      </div>
+    </div>`;
+}
+
+function posPage(){
+  const ready=isClockedInToday();
+  return `
+    <div class="top"><div class="title">Transaksi</div><div class="sub">Input transaksi harian</div></div>
+    <div class="section">${summaryCardsHTML()}</div>
+    <div class="section">
+      <div class="card hero">
+        <div class="page-title">Tambah transaksi</div>
+        <div class="page-sub">${ready ? 'Siap input penjualan' : 'Absen dulu agar transaksi aktif'}</div>
+        <input class="input" id="pos-note" placeholder="Nama barang / keterangan" />
+        <div class="sp12"></div>
+        <div class="card" style="padding:14px;border-radius:14px;box-shadow:none">
+          <div class="sub">Nominal</div>
+          <input id="pos-amount" class="amount" placeholder="0" inputmode="numeric" />
+        </div>
+        <div class="sp12"></div>
+        <button class="btn btn-primary" onclick="handleTransaction()" ${ready ? '' : 'disabled'}>Simpan Transaksi</button>
+      </div>
+    </div>`;
+}
+
+function historyPage(){
+  const list = cachedTransactions;
+  return `
+    <div class="top"><div class="title">Riwayat</div><div class="sub">Semua transaksi terbaru</div></div>
+    <div class="section">
+      <div class="card hero">
+        <div class="page-title">Total transaksi</div>
+        <div class="page-sub">${list.length} data tersimpan</div>
+        <div class="mono" style="font-size:22px;font-weight:800">${formatRupiah(list.reduce((s,t)=>s+Number(t.amount||0),0))}</div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="list">
+        ${list.length ? list.map(t=>`
+          <div class="item">
+            <div class="item-top">
+              <div>
+                <div class="item-title">${escapeHtml(t.note||'Transaksi')}</div>
+                <div class="item-meta">${extractDateFromTime(t.time)} • ${extractClock(t.time)}</div>
+              </div>
+              <div class="item-amt mono">${formatRupiah(t.amount)}</div>
+            </div>
+          </div>`).join('') : '<div class="card empty">Belum ada transaksi</div>'}
+      </div>
+    </div>`;
+}
+
+function reportPage(){
+  const monthStats=getMonthStats();
+  return `
+    <div class="top"><div class="title">Laporan</div><div class="sub">Ringkasan kinerja ${getCurrentMonthLabel()}</div></div>
+    <div class="section">${summaryCardsHTML()}</div>
+    <div class="section">
+      <div class="card hero">
+        <div class="page-title">Laporan bulan ini</div>
+        <div class="grid">
+          <div class="mini" style="padding:0"><div class="lbl">Omzet bulanan</div><div class="num mono">${formatRupiah(getMonthlyRevenue())}</div></div>
+          <div class="mini" style="padding:0"><div class="lbl">Bonus 2%</div><div class="num mono">${formatRupiah(getMonthlyBonus())}</div></div>
+          <div class="mini" style="padding:0"><div class="lbl">Hadir</div><div class="num">${monthStats.hadir} hari</div></div>
+          <div class="mini" style="padding:0"><div class="lbl">Tidak hadir</div><div class="num">${monthStats.tidakHadir} hari</div></div>
+        </div>
+        <div class="divider"></div>
+        <button class="btn btn-primary" onclick="sendTodayReport()">Kirim ringkasan ke Admin</button>
+      </div>
+    </div>`;
+}
+
+function loginPage(){
+  return `
+    <div class="top" style="padding-top:80px;text-align:center">
+      <div class="title">Rocky Hijab</div>
+      <div class="sub">Login staff sederhana</div>
+    </div>
+    <div class="section">
+      <div class="card hero">
+        <input id="login-user" class="input" placeholder="Username" />
+        <div class="sp12"></div>
+        <input id="login-pin" type="password" class="input" placeholder="PIN" inputmode="numeric" />
+        <div class="sp12"></div>
+        <button class="btn btn-primary" onclick="handleLogin()">Masuk</button>
+      </div>
+    </div>`;
+}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+const router = {
+  navigate(page){
+    currentPage=page;
+    const content=document.getElementById('page-content');
+    if(page==='login') content.innerHTML=loginPage();
+    else if(page==='home') content.innerHTML=homePage();
+    else if(page==='pos') content.innerHTML=posPage();
+    else if(page==='history') content.innerHTML=historyPage();
+    else if(page==='report') content.innerHTML=reportPage();
+    setNav(page);
+    if(page==='home') updateLocationChip();
+    if(page==='pos') bindAmountInput();
+  }
+};
+
+function refreshPage(){ if(currentPage!=='login') router.navigate(currentPage); }
+
+window.addEventListener('load',async()=>{
+  await initDB();
+  const hasSession = await checkSession();
+  if(hasSession){
+    document.getElementById('bottom-nav').classList.remove('hidden');
+    await loadCache();
+    await syncFromServer();
+    startAutoSync();
+    router.navigate('home');
+  } else {
+    router.navigate('login');
+  }
+  setTimeout(()=>document.getElementById('loadingOverlay').classList.add('hide'),500);
+});
+</script>
+</body>
+</html>
