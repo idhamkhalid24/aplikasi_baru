@@ -1145,7 +1145,7 @@
         const oe=document.getElementById('total-omzet'),be=document.getElementById('bonus-text');
         const te=document.getElementById('today-income'),ae=document.getElementById('today-attendance-info'),me=document.getElementById('month-omzet');
         if(oe) oe.innerText=`Rp ${formatRupiah(bonus)}`;
-        if(be) be.innerText=`1% dari omzet ${getNamaBulan(m)} · reset tiap bulan`;
+        if(be) be.innerText=` ${getNamaBulan(m)} · reset tiap bulan`;
         const ac=document.getElementById('today-attendance-card'), al=document.getElementById('today-attendance-label');
         if(te) te.innerText=`Rp ${formatRupiah(pendapatanHariIni)}`;
         if(ae) ae.innerText=todayAttendance?formatWIBTime(todayAttendance.time).split(' ')[1].slice(0,5):'--:--';
@@ -1568,7 +1568,7 @@
             <div class="bonus-card page-in s2">
                 <p style="font-size:9.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--amber);margin-bottom:5px;position:relative;z-index:1">Bonus Periode</p>
                 <p style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--text);position:relative;z-index:1">Rp ${formatRupiah(bonus)}</p>
-                <p style="font-size:9.5px;color:var(--text-ghost);margin-top:5px;position:relative;z-index:1">Bonus 2% dari omzet periode aktif</p>
+                <p style="font-size:9.5px;color:var(--text-ghost);margin-top:5px;position:relative;z-index:1"></p>
             </div>
             <div class="card page-in s3" style="padding:16px 18px">
                 <p class="label-xs">Daftar Hadir</p>
@@ -1814,7 +1814,7 @@
                     <div class="card page-in s3" style="padding:16px 16px;margin-bottom:10px">
                         <p class="label-xs" style="margin-bottom:8px">Bonus Bulan Ini</p>
                         <p id="total-omzet" style="font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:800;color:var(--accent);margin-bottom:6px">Rp 0</p>
-                        <p id="bonus-text" style="font-size:11px;color:var(--text-soft)">1% dari omzet bulanan</p>
+                        <p id="bonus-text" style="font-size:11px;color:var(--text-soft)"></p>
                         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
                             <span style="font-size:11px;color:var(--text-soft)">Omzet bulan ini</span>
                             <strong id="month-omzet" style="font-size:12px;color:var(--text)">Rp 0</strong>
