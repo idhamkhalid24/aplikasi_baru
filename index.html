@@ -380,11 +380,15 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 13px 15px;
+            min-height: 44px;
+            line-height: 1.45;
             font-family: 'Inter', sans-serif;
             font-size: 14px;
             color: var(--text);
             outline: none;
             transition: border-color 0.18s, background 0.18s, var(--transition-theme);
+            -webkit-appearance: none;
+            appearance: none;
         }
         .g-input:focus { border-color: var(--border-focus); background: var(--accent-dim); }
         .g-input::placeholder { color: var(--text-ghost); }
@@ -868,7 +872,7 @@
             <div style="display:flex;flex-direction:column;gap:10px">
                 <div style="background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 15px">
                     <p class="label-xs">Keterangan / Item</p>
-                    <input id="modal-pos-note" type="text" placeholder="Pashmina, Hijab, dll..." class="g-input" style="background:none;border:none;padding:0;font-size:15px">
+                    <input id="modal-pos-note" type="text" placeholder="Pashmina, Hijab, dll..." class="g-input" style="background:none;border:none;padding:4px 0 2px;font-size:15px;line-height:1.45;min-height:30px;display:block">
                 </div>
                 <div style="background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 15px">
                     <p class="label-xs">Nominal</p>
@@ -1835,7 +1839,7 @@
                     <div id="pos-status"></div>
                     <div class="card page-in s1" style="padding:14px 16px;margin-bottom:10px">
                         <p class="label-xs" style="margin-bottom:8px">Keterangan / Item</p>
-                        <input id="pos-note" type="text" placeholder="Contoh: Pashmina, Hijab, dll" style="width:100%;background:none;border:none;outline:none;font-size:15px;color:var(--text);font-family:'Plus Jakarta Sans',sans-serif">
+                        <input id="pos-note" type="text" placeholder="Contoh: Pashmina, Hijab, dll" style="width:100%;background:none;border:none;outline:none;font-size:15px;line-height:1.45;min-height:30px;padding:4px 0 2px;display:block;color:var(--text);font-family:'Inter',sans-serif">
                     </div>
                     <div class="card page-in s2" style="padding:14px 16px;margin-bottom:12px">
                         <p class="label-xs" style="margin-bottom:8px">Nominal</p>
