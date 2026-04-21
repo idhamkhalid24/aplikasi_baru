@@ -921,6 +921,33 @@
     let pendingClockInData = null, currentPage = 'home';
     let cachedTransactions = [], cachedAttendance = [];
     const SYNC_INTERVAL = 30000;
+    const SESSION_STORAGE_PREFIX = 'rocky_session_';
+
+    const getSessionKey = key => currentUser ? `${SESSION_STORAGE_PREFIX}${currentUser.username}_${key}` : `${SESSION_STORAGE_PREFIX}guest_${key}`;
+    const getStoredCurrentUser = () => localStorage.getItem('current_user');
+    const setStoredCurrentUser = value => localStorage.setItem('current_user', value);
+    const clearLegacyAttendanceFlags = () => {
+        localStorage.removeItem('has_clocked_in');
+        localStorage.removeItem('last_attendance_date');
+    };
+    const getAttendanceState = () => {
+        if (!currentUser) return { hasClockedIn: false, lastDate: null };
+        return {
+            hasClockedIn: localStorage.getItem(getSessionKey('has_clocked_in')) === 'true',
+            lastDate: localStorage.getItem(getSessionKey('last_attendance_date'))
+        };
+    };
+    const setAttendanceState = ({ hasClockedIn = false, lastDate = null } = {}) => {
+        if (!currentUser) return;
+        localStorage.setItem(getSessionKey('has_clocked_in'), hasClockedIn ? 'true' : 'false');
+        if (lastDate) localStorage.setItem(getSessionKey('last_attendance_date'), lastDate);
+        else localStorage.removeItem(getSessionKey('last_attendance_date'));
+    };
+    const clearAttendanceStateForUser = username => {
+        if (!username) return;
+        localStorage.removeItem(`${SESSION_STORAGE_PREFIX}${username}_has_clocked_in`);
+        localStorage.removeItem(`${SESSION_STORAGE_PREFIX}${username}_last_attendance_date`);
+    };
 
     // ── THEME ──
     const getTheme = () => localStorage.getItem('theme') || 'dark';
@@ -972,8 +999,7 @@
         const at=await dbAction('transactions','getAll'); cachedTransactions=at.filter(t=>t.user===currentUser.username);
         const aa=await dbAction('attendance','getAll'); cachedAttendance=aa.filter(a=>a.user===currentUser.username);
         const td=getTodayWIB(),has=cachedAttendance.some(a=>extractDateFromTime(a.time)===td);
-        localStorage.setItem('has_clocked_in',has?'true':'false');
-        if(has) localStorage.setItem('last_attendance_date',td);
+        setAttendanceState({ hasClockedIn: has, lastDate: has ? td : null });
     };
 
     // ── SYNC ──
@@ -1025,18 +1051,17 @@
 
     // ── ABSEN CHECK ──
     const hasClockedInToday = async () => {
-        const td=getTodayWIB(),last=localStorage.getItem('last_attendance_date');
-        if(last===td) return true;
+        const td=getTodayWIB(), state=getAttendanceState();
+        if(state.lastDate===td) return true;
         const has=cachedAttendance.some(a=>extractDateFromTime(a.time)===td);
-        localStorage.setItem('has_clocked_in',has?'true':'false');
-        if(has) localStorage.setItem('last_attendance_date',td);
+        setAttendanceState({ hasClockedIn: has, lastDate: has ? td : null });
         return has;
     };
     const resetDailyAttendanceState = () => {
-        const td=getTodayWIB(), last=localStorage.getItem('last_attendance_date');
-        if(last && last!==td){
-            localStorage.removeItem('has_clocked_in');
-            localStorage.removeItem('last_attendance_date');
+        if(!currentUser) return;
+        const td=getTodayWIB(), state=getAttendanceState();
+        if(state.lastDate && state.lastDate!==td){
+            setAttendanceState({ hasClockedIn: false, lastDate: null });
         }
     };
     function calculateBonus(o){ return Math.round((o||0)*0.01); }
@@ -1098,7 +1123,7 @@
 
     // ── ABSEN ──
     const handleClockIn = async () => {
-        if(localStorage.getItem('last_attendance_date')===getTodayWIB()||await hasClockedInToday()){showToast("Sudah absen hari ini!");return;}
+        if(getAttendanceState().lastDate===getTodayWIB()||await hasClockedInToday()){showToast("Sudah absen hari ini!");return;}
         if(!currentPos) return showToast("Tunggu lokasi!",true);
         const dist=calculateDistance(currentPos.lat,currentPos.lng,OFFICE_LOC.lat,OFFICE_LOC.lng);
         if(dist>RADIUS_LIMIT) return showToast(`Di luar radius (${Math.round(dist)}m)`,true);
@@ -1106,7 +1131,7 @@
         try {
             const data={user:currentUser.username,name:currentUser.name,time:getWIBForSheet(),loc:currentPos};
             const nid=await dbAction('attendance','add',data); data.id=nid; cachedAttendance.push(data);
-            localStorage.setItem('has_clocked_in','true'); localStorage.setItem('last_attendance_date',getTodayWIB());
+            setAttendanceState({ hasClockedIn:true, lastDate:getTodayWIB() });
             syncToServer('attendance',data).catch(()=>{});
             showAbsenModal(data);
             if(currentPage==='home') await updateHomeStatus();
@@ -1351,9 +1376,13 @@
             let ud=await dbAction('users','get',u);
             if(navigator.onLine){try{const r=await fetch(`${GAS_WEB_APP_URL}?action=get&type=users&userId=${encodeURIComponent(u)}&t=${Date.now()}`),d=await r.json();if(d.success&&d.data&&d.data.length>0){await dbAction('users','put',d.data[0]);ud=d.data[0];}}catch(e){}}
             if(ud&&ud.pin===p){
-                currentUser=ud; localStorage.setItem('current_user',JSON.stringify({username:ud.username,pin:ud.pin}));
-                await loadCache(); if(navigator.onLine) await syncFromServer(false);
-                showToast("✓ Login berhasil!"); router.navigate('home');
+                await clearAppSession(false);
+                currentUser=ud;
+                setStoredCurrentUser(JSON.stringify({username:ud.username,pin:ud.pin}));
+                resetDailyAttendanceState();
+                await loadCache();
+                if(navigator.onLine) await syncFromServer(false);
+                showToast(`✓ Login ${ud.name}`); router.navigate('home');
             } else showToast("Username/PIN salah!",true);
         } catch(e){ showToast("Error login",true); }
         setLoading(false);
@@ -1531,7 +1560,10 @@
     const closeResetModal = () => { const e=document.getElementById('reset-modal'); e.classList.remove('show'); e.style.display='none'; };
     const confirmReset = () => {
         if(document.getElementById('reset-password').value===RESET_PASSWORD){
-            localStorage.clear(); sessionStorage.clear(); indexedDB.deleteDatabase("AttendancePOSDB");
+            clearLegacyAttendanceFlags();
+            localStorage.removeItem('current_user');
+            sessionStorage.clear();
+            indexedDB.deleteDatabase("AttendancePOSDB");
             showToast("Reset berhasil!"); setTimeout(()=>location.reload(),1500);
         } else { showToast("Password salah!",true); closeResetModal(); }
     };
@@ -1581,38 +1613,59 @@
         setLoading(false);
     };
 
-    const clearAppSession = async () => {
-        const keys = ['current_user','has_clocked_in','last_attendance_date'];
-        keys.forEach(k => localStorage.removeItem(k));
+    const clearAppSession = async (clearCaches = true) => {
+        const activeUsername = currentUser?.username || (() => {
+            try {
+                const saved = JSON.parse(getStoredCurrentUser() || 'null');
+                return saved?.username || null;
+            } catch (e) { return null; }
+        })();
+        localStorage.removeItem('current_user');
+        clearLegacyAttendanceFlags();
+        if (activeUsername) clearAttendanceStateForUser(activeUsername);
         sessionStorage.clear();
-        try {
-            if ('caches' in window) {
-                const names = await caches.keys();
-                await Promise.all(names.map(name => caches.delete(name)));
-            }
-        } catch (e) {}
+        if (clearCaches) {
+            try {
+                if ('caches' in window) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(name => caches.delete(name)));
+                }
+            } catch (e) {}
+        }
     };
 
     const handleLogout = async () => {
         if(confirm("Keluar dari aplikasi?")){
-            await clearAppSession();
+            setLoading(true);
+            const loggedOutName = currentUser?.name || '';
+            await clearAppSession(true);
             currentUser=null;
+            currentPos=null;
             cachedTransactions=[];
             cachedAttendance=[];
+            setLoading(false);
+            showToast(loggedOutName ? `✓ Logout ${loggedOutName}` : "✓ Logout berhasil");
             router.navigate('login');
         }
     };
 
     // ── SESSION ──
     const checkExistingSession = async () => {
-        resetDailyAttendanceState();
-        const sv=localStorage.getItem('current_user');
+        clearLegacyAttendanceFlags();
+        const sv=getStoredCurrentUser();
         if(sv){
             try {
                 const ud=JSON.parse(sv),v=await dbAction('users','get',ud.username);
-                if(v&&v.pin===ud.pin){ currentUser=v; await loadCache(); if(navigator.onLine) await syncFromServer(false); return true; }
+                if(v&&v.pin===ud.pin){
+                    currentUser=v;
+                    resetDailyAttendanceState();
+                    await loadCache();
+                    if(navigator.onLine) await syncFromServer(false);
+                    return true;
+                }
             } catch(e){}
-        } return false;
+        }
+        return false;
     };
 
     // ── ROUTER ──
