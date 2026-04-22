@@ -949,7 +949,24 @@
     const RESET_PASSWORD = "rockyhijab";
     const ADMIN_PIN = "123456";
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwhHGVQ3RpgCx6FIosopNHO6uE3UAh6BGOFOxd6Eo65levqmbqeLi_oDAqu-Aqbbx1_Xw/exec";
-    const BACKUP_APP_URL = "https://idhamkhalid24.github.io/projeck1/";
+    const BACKUP_APP_URL = "https://idhamkhalid24.github.io/link_my_kasir/";
+
+    // ── OPEN EXTERNAL BROWSER ──
+    const openExternalBrowser = (url) => {
+        // Coba buka dengan intent Android (untuk WebView/TWA)
+        try {
+            const intentUrl = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+            window.location = intentUrl;
+        } catch(e) {}
+        // Fallback: buka via window.open dengan _system (Cordova/WebView) atau _blank
+        setTimeout(() => {
+            if (window.cordova && window.cordova.InAppBrowser) {
+                window.cordova.InAppBrowser.open(url, '_system');
+            } else {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+        }, 300);
+    };
 
     let currentUser = null, currentPos = null, appDb, userDb;
     let currentFilter = 'daily', rangeStartDate = null, rangeEndDate = null;
@@ -1815,10 +1832,10 @@
 
                     <!-- Backup Link di Halaman Login -->
                     <div style="margin-top: 20px; text-align: center;" class="page-in s3">
-                        <a href="${BACKUP_APP_URL}" target="_blank" class="backup-link">
+                        <button onclick="openExternalBrowser('${BACKUP_APP_URL}')" class="backup-link" style="cursor:pointer;border:none;font-family:'Inter',sans-serif">
                             <i class="fas fa-external-link-alt"></i>
-                            Akses Aplikasi Via Browser
-                        </a>
+                            Akses Aplikasi Realtime
+                        </button>
                     </div>
                 </div>`;
 
@@ -2070,3 +2087,4 @@
 </script>
 </body>
 </html>
+a
