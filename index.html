@@ -107,6 +107,13 @@
     .ops-today-badge{font-size:10px;background:#fff0d0;color:#b06000;border-radius:999px;padding:4px 9px;font-weight:900}
     .ops-list-item{display:flex;justify-content:space-between;align-items:center;gap:8px;background:white;border:1px solid #ffe0b2;border-radius:12px;padding:9px 11px;margin-bottom:6px}
 
+    /* === SHORTCUT SAAT DATA DI-HIDE === */
+    .hidden-mode-shortcuts{display:none;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 0}
+    .sensitive-wrap.sensitive-hidden .hidden-mode-shortcuts{display:grid}
+    .shortcut-btn{border-radius:16px;padding:12px 10px;min-height:48px;font-size:13px;font-weight:900;box-shadow:var(--shadow)}
+    .shortcut-btn.ops{background:#fff3e0;color:#e8820c;border:1px solid #ffd7a0}
+    .shortcut-btn.qris{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+
 
     /* === NAV PREMIUM ANDROID FRIENDLY (UI ONLY) === */
     .app{padding-bottom:104px!important}
@@ -342,6 +349,10 @@
       </div><!-- /sens-bar sisa operasional -->
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:8px"><div><div class="section-title" style="margin:0 0 3px">Zakat Mal</div><div id="zakatAmountLarge" class="num gold" style="font-size:23px">Rp 0</div><div id="zakatPaymentStatusText" class="small">Menunggu</div></div><button id="payZakatBtn" class="btn gold" style="width:auto;min-width:92px;padding:10px" onclick="markZakatPaid()">Bayar</button></div><div class="grid2" style="margin-top:10px"><div class="stat"><span>Laba 20% (Manual+Firebase)</span><b id="totalProfitDisplay" class="num">Rp 0</b></div><div class="stat"><span>Belum Dizakatkan</span><b id="unpaidProfitDisplay" class="num">Rp 0</b></div></div><div style="font-size:10px;color:var(--muted);font-weight:800;margin-top:7px;padding-top:7px;border-top:1px solid var(--line)">Zakat = 2.5% × laba bersih (20% dari total pendapatan manual + Firebase)</div><div style="display:none"><span id="totalZakatPaidProfit">Rp 0</span></div><div id="zakatHistoryPreview" class="zakat-mini" style="display:none"><div id="zakatHistoryMiniList" class="zakat-mini"></div><button class="tab" onclick="showZakatHistoryModal()">Semua</button></div></div>
       <button class="btn whatsapp" onclick="sendWhatsAppReport()">Laporan WA</button>
+      <div id="hiddenModeShortcuts" class="hidden-mode-shortcuts">
+        <button class="shortcut-btn ops" onclick="openOpsModal()">+ Ops</button>
+        <button class="shortcut-btn qris" onclick="openCashOutModal()">+ QRIS</button>
+      </div>
     </section>
 
     <div id="transactionModal" class="modal hidden"><div class="box"><h3 style="margin:0 0 12px;text-align:center">Input Transaksi</h3><div class="row"><div class="field"><input type="date" id="inputDate"></div><div class="field"><select id="type" onchange="updatePlaceholder()"><option value="income">Pemasukan</option><option value="expense">Pengeluaran</option></select></div></div><div class="field"><input type="text" id="description" placeholder="Deskripsi"></div><div class="field amount-wrap"><input type="number" id="amount" placeholder="Nominal" oninput="handleSmartAmount(this)"><span id="liveAmountPreview" class="preview"></span></div><div class="row"><button class="btn secondary" onclick="closeTransactionModal()">Batal</button><button class="btn" onclick="addTransaction()">Simpan</button></div><p class="small" style="margin-bottom:0">Catatan: nominal otomatis dikali 1.000 seperti versi sebelumnya.</p></div></div>
