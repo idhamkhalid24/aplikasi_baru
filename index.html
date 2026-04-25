@@ -1235,7 +1235,26 @@ function renderOpsTodayList(){
   const te=$('opsTodayTotal');if(te)te.innerText=formatRupiah(total);
   const list=$('opsTodayList');if(!list)return;
   if(!rows.length){list.innerHTML='<div class="empty">Belum ada operasional hari ini</div>';return;}
-  list.innerHTML=rows.map(t=>`<div class="ops-list-item"><div style="min-width:0;flex:1"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(String(t.description||'').replace(OPS_PREFIX,''))}</b><small style="color:var(--muted)">${t.date}</small></div><b class="num red" style="font-size:13px;white-space:nowrap">-${formatRupiah(t.amount).replace('Rp','')}</b><button class="x" onclick="deleteTransaction(${t.id});setTimeout(renderOpsTodayList,400)">×</button></div>`).join('');
+  list.innerHTML=rows.map(t=>`<div class="ops-list-item"><div style="min-width:0;flex:1"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(String(t.description||'').replace(OPS_PREFIX,''))}</b><small style="color:var(--muted)">${t.date}</small></div><b class="num red" style="font-size:13px;white-space:nowrap">-${formatRupiah(t.amount).replace('Rp','')}</b><button class="x" style="color:var(--red);font-size:18px;padding:4px 8px" onclick="deleteOpsExpenseWithPin(${t.id})">×</button></div>`).join('');
+}
+
+function deleteOpsExpenseWithPin(id){
+  const t=(transactions||[]).find(x=>Number(x.id)===Number(id));
+  if(!t||!isOpsExpense(t)){showToast('Data operasional tidak ditemukan');return}
+  closeOpsModal();
+  setTimeout(()=>{
+    openPasswordModal(async()=>{
+      try{
+        await deleteTransactionFromDB(id);
+        await loadTransactions();
+        validateAndCancelInvalidZakat();
+        render();
+        renderCashFisik();
+        showToast('Operasional toko dihapus');
+      }catch(e){showToast('Gagal hapus: '+e.message)}
+      setTimeout(()=>{openOpsModal();},200);
+    });
+  },200);
 }
 async function addOpsExpense(){
   const desc=$('opsDesc').value.trim();
