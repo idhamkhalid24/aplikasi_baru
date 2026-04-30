@@ -763,7 +763,7 @@ function getFirebaseRecordDateKey(t){
   if(Number(t.timestamp||0))return getLocalDateString(new Date(Number(t.timestamp)));
   return '';
 }
-function isFirebaseRecordDeleted(t){return t&&(t.deleted===true||t.deleted==='true'||t.isDeleted===true||t.isDeleted==='true')}
+function isFirebaseRecordDeleted(t){return t&&(t.deleted===true||t.deleted==='true'||t.isDeleted===true||t.isDeleted==='true'||t.canceled===true||t.canceled==='true'||t.cancelled===true||t.cancelled==='true'||t.status==='deleted'||t.status==='canceled'||t.status==='cancelled')}
 function normalizeFirebaseRows(rows){
   return (rows||[])
     .map(t=>({...t,dateKey:getFirebaseRecordDateKey(t),amount:Number(t.amount||0)}))
@@ -1771,11 +1771,20 @@ function getRismaDisplayName(){
 function hasRismaBonusValue(v){
   return v!==undefined&&v!==null&&String(v).trim()!=='';
 }
+function normalizeRismaRole(role){
+  const value=normalizeRismaUsername(role||'staff');
+  if(['harian','daily','karyawan_harian','karyawan harian'].includes(value))return 'harian';
+  if(value==='admin')return 'admin';
+  return 'staff';
+}
 function getRismaUserRole(profile=rismaUserProfile){
-  return normalizeRismaUsername(profile?.role||'staff')||'staff';
+  return normalizeRismaRole(profile?.role||'staff');
 }
 function getRismaBonusGroup(profile=rismaUserProfile){
   return getRismaUserRole(profile)==='harian'?'harian':'staff';
+}
+function isRismaStaffEmployee(profile=rismaUserProfile){
+  return getRismaUserRole(profile)==='staff';
 }
 function getCompatServerTimestamp(){
   try{
@@ -1794,8 +1803,7 @@ function normalizeRismaRows(rows){
   return normalizeFirebaseRows(rows||[]).filter(t=>isRismaTransaction(t));
 }
 function isRismaDailyEmployee(profile=rismaUserProfile){
-  const role=getRismaUserRole(profile);
-  return ['harian','daily','karyawan_harian'].includes(role);
+  return getRismaUserRole(profile)==='harian';
 }
 function isRismaManualBonus(b){
   if(!b||isFirebaseRecordDeleted(b))return false;
@@ -1812,7 +1820,7 @@ function getRismaManualBonusMonth(b){
   return dk?dk.slice(0,7):'';
 }
 function getRismaMonthlyManualBonus(month=getLocalDateString().slice(0,7)){
-  if(isRismaDailyEmployee())return 0;
+  if(!isRismaStaffEmployee())return 0;
   return (rismaManualBonusRows||[])
     .filter(b=>isRismaManualBonus(b)&&getRismaManualBonusMonth(b)===month)
     .reduce((sum,b)=>sum+Number(b.amount||0),0);
@@ -1851,6 +1859,8 @@ function getRismaTransactionBonusPercent(profile=rismaUserProfile){
   return Number((getRismaTransactionBonusRate(profile)*100).toFixed(3));
 }
 function getRismaClosingBonusPerMinute(profile=rismaUserProfile){
+  const role=getRismaUserRole(profile);
+  if(role==='harian'||role==='admin')return 0;
   if(profile&&hasRismaBonusValue(profile.closingBonusPerMinute)){
     const amount=Number(profile.closingBonusPerMinute);
     if(Number.isFinite(amount)&&amount>=0)return amount;
@@ -1896,7 +1906,9 @@ async function fetchLatestRismaBonusBeforeSave(){
   }else{
     rismaBonusSettings={transactionBonusRate:DEFAULT_RISMA_BONUS_RATE,closingBonusPerMinute:DEFAULT_RISMA_CLOSING_BONUS_PER_MINUTE};
   }
-  const freshUser={_docId:userSnap.id,username:userSnap.data().username||userSnap.id,...(userSnap.data()||{})};
+  const rawUser=userSnap.data()||{};
+  const freshRole=normalizeRismaRole(rawUser.role||'staff');
+  const freshUser={_docId:userSnap.id,username:rawUser.username||userSnap.id,...rawUser,role:freshRole,closingBonusPerMinute:(freshRole==='harian'||freshRole==='admin')?0:rawUser.closingBonusPerMinute};
   if(freshUser.active===false||freshUser.deleted===true||freshUser.deleted==='true')throw new Error('User Risma sudah nonaktif');
   rismaUserProfile=freshUser;
   return {user:freshUser,snapshot:getRismaBonusSnapshot(freshUser)};
@@ -1906,9 +1918,9 @@ function normalizeRismaMonthKey(value){
 }
 function getRismaClosingBonusForRecord(c){
   // Selaras dengan index: bonus closing user tertentu hanya dihitung dari bonusByUser[user].
-  // Karyawan harian tidak dapat bonus closing, jadi jangan fallback ke bonusPerUser/totalBonus/delayMinutes.
+  // Karyawan harian/admin tidak dapat bonus closing, jadi jangan fallback ke bonusPerUser/totalBonus/delayMinutes.
   if(!c || !(c.closed===true || c.closed==='true'))return 0;
-  if(isRismaDailyEmployee())return 0;
+  if(!isRismaStaffEmployee())return 0;
   const byUser=c.bonusByUser||{};
   if(Object.prototype.hasOwnProperty.call(byUser,RISMA_USERNAME)){
     const value=Number(byUser[RISMA_USERNAME]||0);
@@ -2035,7 +2047,13 @@ function startRismaUserWatch(){
   if(rismaUserUnsub){rismaUserUnsub();rismaUserUnsub=null;}
   try{
     rismaUserUnsub=firebaseDb.collection('users').doc(RISMA_USERNAME).onSnapshot(doc=>{
-      rismaUserProfile=doc.exists?{_docId:doc.id,...(doc.data()||{})}:null;
+      if(doc.exists){
+        const data=doc.data()||{};
+        const role=normalizeRismaRole(data.role||'staff');
+        rismaUserProfile={_docId:doc.id,username:data.username||doc.id,...data,role,closingBonusPerMinute:(role==='harian'||role==='admin')?0:data.closingBonusPerMinute};
+      }else{
+        rismaUserProfile=null;
+      }
       renderRismaToday();
       renderRismaMonthBonus();
     },err=>console.warn('Watch user Risma gagal:',err));
@@ -2142,14 +2160,14 @@ async function getRismaTodayClosing(){
   if(!firebaseDb)return null;
   const today=getLocalDateString();
   try{
-    const userDoc=await firebaseDb.collection('closings').doc(`${today}_${RISMA_USERNAME}`).get();
+    const userDoc=await firebaseDb.collection('closings').doc(`${today}_${RISMA_USERNAME}`).get({source:'server'});
     if(userDoc.exists){
       const data=userDoc.data()||{};
       if(data.closed===true || data.closed==='true')return {id:userDoc.id,...data};
     }
   }catch(e){console.warn('Cek closing user Risma gagal:',e)}
   try{
-    const doc=await firebaseDb.collection('closings').doc(today).get();
+    const doc=await firebaseDb.collection('closings').doc(today).get({source:'server'});
     if(doc.exists){
       const data=doc.data()||{};
       if(data.closed===true || data.closed==='true')return {id:doc.id,...data};
@@ -2158,7 +2176,7 @@ async function getRismaTodayClosing(){
     console.warn('Cek closing doc gagal:',e);
   }
   try{
-    const snap=await firebaseDb.collection('closings').where('dateKey','==',today).get();
+    const snap=await firebaseDb.collection('closings').where('dateKey','==',today).get({source:'server'});
     const found=snap.docs.map(d=>({id:d.id,...(d.data()||{})})).find(c=>c.closed===true || c.closed==='true');
     return found||null;
   }catch(e){
@@ -2174,7 +2192,7 @@ async function hasRismaClockedInToday(){
     const snap=await firebaseDb.collection('attendance')
       .where('user','==',RISMA_USERNAME)
       .where('dateKey','==',today)
-      .get();
+      .get({source:'server'});
     return snap.docs.some(d=>{
       const a=d.data()||{};
       return a.deleted!==true && a.deleted!=='true';
@@ -2182,7 +2200,7 @@ async function hasRismaClockedInToday(){
   }catch(e){
     console.warn('Cek absen Risma query utama gagal:',e);
     try{
-      const snap=await firebaseDb.collection('attendance').where('dateKey','==',today).get();
+      const snap=await firebaseDb.collection('attendance').where('dateKey','==',today).get({source:'server'});
       return snap.docs.some(d=>{
         const a=d.data()||{};
         const user=String(a.user||a.username||'').trim().toLowerCase();
@@ -2273,7 +2291,7 @@ async function addRismaTransaction(){
 async function getRismaUserPin(){
   if(!firebaseDb)return '';
   try{
-    const snap=await firebaseDb.collection('users').doc(RISMA_USERNAME).get();
+    const snap=await firebaseDb.collection('users').doc(RISMA_USERNAME).get({source:'server'});
     if(!snap.exists)return '';
     const user=snap.data()||{};
     return String(user.pin||user.PIN||user.password||'').trim();
