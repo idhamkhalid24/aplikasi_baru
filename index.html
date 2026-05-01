@@ -206,6 +206,21 @@
     @keyframes rismaPartyFly{0%{transform:translate(-50%,-50%) scale(.6) rotate(0deg);opacity:1}100%{transform:translate(var(--x),var(--y)) scale(1) rotate(var(--r));opacity:0}}
     @media(prefers-reduced-motion:reduce){.risma-party-box,.risma-party-emoji,.risma-party-box::before,.risma-party-confetti i{animation:none}.risma-first-tx-party.show,.risma-manual-bonus-party.show{opacity:1}}
 
+
+    /* === FAB KHUSUS TRANSAKSI FIREBASE RISMA === */
+    .risma-fab{
+      display:none;
+      background:linear-gradient(135deg,#be185d,#9d174d)!important;
+      color:white!important;
+      bottom:94px!important;
+      z-index:61!important;
+      box-shadow:0 12px 28px rgba(190,24,93,.32)!important;
+    }
+    .risma-fab:active{transform:scale(.96)}
+    .risma-tx-modal-card{background:#fff0f6;border:1px solid #f9a8d4;border-radius:18px;padding:14px;margin-bottom:10px}
+    @media(max-width:440px){.risma-fab{right:16px!important}}
+    @media(max-width:360px){.risma-fab{right:14px!important;bottom:92px!important}}
+
   </style>
 </head>
 <body>
@@ -544,20 +559,7 @@
         </div>
       </div>
 
-      <!-- Form input penjualan -->
-      <div class="card" style="margin-bottom:10px">
-        <div class="section-title" style="margin:0 0 8px;color:#be185d">+ Input Penjualan</div>
-        <div class="field">
-          <input type="text" id="rismaDesc" placeholder="Nama barang / keterangan (opsional)" style="border-color:#f9a8d4">
-        </div>
-        <div class="field amount-wrap">
-          <input type="number" id="rismaAmount" placeholder="Nominal (×1.000)" oninput="handleRismaAmountPreview(this)" style="font-size:21px;font-weight:900;padding-right:105px;border-color:#f9a8d4">
-          <span id="rismaAmountPreview" class="preview" style="color:#be185d"></span>
-        </div>
-        <button class="btn" id="rismaSaveBtn" style="background:linear-gradient(135deg,#be185d,#9d174d);font-size:15px" onclick="addRismaTransaction()">
-          💾 Simpan Penjualan
-        </button>
-      </div>
+      <!-- Form Input Penjualan dipindahkan ke FAB khusus Risma -->
 
       <!-- Riwayat transaksi hari ini -->
       <div class="card">
@@ -572,7 +574,35 @@
     </section>
 
   </main>
+
+
+    <div id="rismaTransactionModal" class="modal hidden">
+      <div class="box" style="max-width:400px;width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">
+          <div>
+            <h3 style="margin:0;font-size:16px;color:#be185d">Input Penjualan Risma</h3>
+            <small style="color:var(--muted);font-size:11px;font-weight:800">Transaksi Firebase khusus kasir Risma</small>
+          </div>
+          <button class="x" style="font-size:22px;padding:4px 6px" onclick="closeRismaTransactionModal()">×</button>
+        </div>
+        <div class="risma-tx-modal-card">
+          <div class="field">
+            <input type="text" id="rismaDesc" placeholder="Nama barang / keterangan (opsional)" style="border-color:#f9a8d4">
+          </div>
+          <div class="field amount-wrap">
+            <input type="number" id="rismaAmount" placeholder="Nominal (×1.000)" oninput="handleRismaAmountPreview(this)" style="font-size:21px;font-weight:900;padding-right:105px;border-color:#f9a8d4">
+            <span id="rismaAmountPreview" class="preview" style="color:#be185d"></span>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn secondary" onclick="closeRismaTransactionModal()">Batal</button>
+          <button class="btn" id="rismaSaveBtn" style="background:linear-gradient(135deg,#be185d,#9d174d);font-size:15px" onclick="addRismaTransaction()">💾 Simpan</button>
+        </div>
+      </div>
+    </div>
+
   <button id="fabBtn" class="fab" onclick="openTransactionModal()" aria-label="Input transaksi">+</button>
+  <button id="rismaFabBtn" class="fab risma-fab" onclick="openRismaTransactionModal()" aria-label="Input penjualan Risma">+</button>
   <nav class="nav" style="grid-template-columns:repeat(4,1fr)">
     <button id="nav-home" class="active" onclick="goPage('home')">🏠 Home</button>
     <button id="nav-history" onclick="goPage('history')">📋 Riwayat</button>
@@ -673,6 +703,7 @@ function doReveal(){
   wrap&&wrap.classList.remove('sensitive-hidden');
   histWrap&&histWrap.classList.remove('sensitive-hidden');
   if(fab)fab.style.display='grid';
+  updateRismaFabVisibility();
   icon.innerHTML='<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
 }
 
@@ -685,6 +716,7 @@ function doHide(){
   wrap&&wrap.classList.add('sensitive-hidden');
   histWrap&&histWrap.classList.add('sensitive-hidden');
   if(fab)fab.style.display='none';
+  updateRismaFabVisibility();
   icon.innerHTML='<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
 }
 
@@ -738,12 +770,13 @@ window.addEventListener('load',function(){
   if(histWrap)histWrap.classList.add('sensitive-hidden');
   const fab=$('fabBtn');
   if(fab)fab.style.display='none';
+  updateRismaFabVisibility();
 });
 let firebaseDb=null,firebaseUnsub=null,todayFirebaseUnsub=null,firebaseUploadDate='',firebaseIncomeRows=[],firebaseIncomeTotal=0,todayFirebaseIncomeRows=[],todayFirebaseIncomeTotal=0,pendingFirebaseUploads=[],monthValidityBusy=false;
 function $(id){return document.getElementById(id)}
 function isSupabaseConfigured(){return SUPABASE_URL&&SUPABASE_ANON_KEY&&!SUPABASE_URL.includes('ISI_')&&!SUPABASE_ANON_KEY.includes('ISI_')}
 function initSupabase(){if(!isSupabaseConfigured()){showToast('Supabase belum disetting');return false}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);return true}
-function goPage(p){currentPage=p;['home','history','firebase','risma'].forEach(x=>{ const pg=$('page'+x[0].toUpperCase()+x.slice(1)); if(pg)pg.classList.toggle('active',x===p); const nav=$('nav-'+x); if(nav)nav.classList.toggle('active',x===p)}); render(); if(p==='firebase')renderFirebaseUploadCard(); if(p==='risma')initRismaPage();}
+function goPage(p){currentPage=p;['home','history','firebase','risma'].forEach(x=>{ const pg=$('page'+x[0].toUpperCase()+x.slice(1)); if(pg)pg.classList.toggle('active',x===p); const nav=$('nav-'+x); if(nav)nav.classList.toggle('active',x===p)}); updateRismaFabVisibility(); render(); if(p==='firebase')renderFirebaseUploadCard(); if(p==='risma')initRismaPage();}
 function openTransactionModal(){$('inputDate').value=getLocalDateString();$('transactionModal').classList.remove('hidden');setTimeout(()=>$('amount').focus(),80)}
 function closeTransactionModal(){$('transactionModal').classList.add('hidden')}
 function getZakatHistory(){return zakatHistory||[]}
@@ -1833,6 +1866,68 @@ function normalizeRismaUsername(value){
 function getRismaDisplayName(){
   return String(rismaUserProfile?.name||RISMA_NAME||RISMA_USERNAME).trim()||RISMA_NAME;
 }
+
+function askRismaClosingPin(message='Masukkan PIN Risma:', title='Verifikasi PIN Risma'){
+  return new Promise((resolve)=>{
+    const old=document.getElementById('risma-closing-pin-modal');
+    if(old)old.remove();
+    const safeText=escapeHtml(message).replace(/\n/g,'<br>');
+    const safeTitle=escapeHtml(title);
+    const wrap=document.createElement('div');
+    wrap.id='risma-closing-pin-modal';
+    wrap.className='modal';
+    wrap.style.zIndex='260';
+    wrap.innerHTML=`<div class="box" style="max-width:330px;text-align:center">
+      <div style="font-size:30px;margin-bottom:8px">🔐</div>
+      <h3 style="margin:0 0 5px;color:#be185d">${safeTitle}</h3>
+      <p class="small" style="margin:0 0 12px;color:#6b7280;line-height:1.35">${safeText}</p>
+      <input id="rismaClosingPinInput" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" placeholder="PIN Risma" maxlength="12" style="text-align:center;font-size:22px;letter-spacing:5px;border-color:#f9a8d4">
+      <div class="row" style="margin-top:10px">
+        <button id="rismaClosingPinCancel" class="btn secondary" type="button">Batal</button>
+        <button id="rismaClosingPinOk" class="btn" type="button" style="background:linear-gradient(135deg,#be185d,#9d174d)">Lanjut</button>
+      </div>
+    </div>`;
+    document.body.appendChild(wrap);
+    const input=document.getElementById('rismaClosingPinInput');
+    const close=(value)=>{wrap.remove();resolve(value);};
+    document.getElementById('rismaClosingPinCancel')?.addEventListener('click',()=>close(null));
+    document.getElementById('rismaClosingPinOk')?.addEventListener('click',()=>close(String(input?.value||'').trim()));
+    wrap.addEventListener('click',(e)=>{if(e.target===wrap)close(null);});
+    input?.addEventListener('keydown',(e)=>{if(e.key==='Enter')close(String(input.value||'').trim());if(e.key==='Escape')close(null);});
+    setTimeout(()=>input?.focus(),80);
+  });
+}
+async function getLatestRismaPinForClosing(){
+  let data=rismaUserProfile||{};
+  if(firebaseDb){
+    try{
+      const snap=await firebaseDb.collection('users').doc(RISMA_USERNAME).get({source:'server'});
+      if(snap.exists){
+        const raw=snap.data()||{};
+        const role=normalizeRismaRole(raw.role||'staff');
+        data={_docId:snap.id,username:raw.username||snap.id,...raw,role,closingBonusPerMinute:(role==='harian'||role==='admin')?0:raw.closingBonusPerMinute};
+        rismaUserProfile=data;
+      }
+    }catch(e){
+      console.warn('Cek PIN Risma dari server gagal, pakai data lokal:',e);
+    }
+  }
+  return String(data.pin??data.PIN??data.password??'').trim();
+}
+async function verifyRismaClosingPin(){
+  const expected=await getLatestRismaPinForClosing();
+  if(!expected){
+    showToast('PIN user Risma belum disetel di admin');
+    return false;
+  }
+  const pin=await askRismaClosingPin('Masukkan PIN user Risma untuk menjalankan closing.', 'PIN Closing Risma');
+  if(!pin)return false;
+  if(String(pin)!==String(expected)){
+    showToast('PIN Risma salah');
+    return false;
+  }
+  return true;
+}
 function hasRismaBonusValue(v){
   return v!==undefined&&v!==null&&String(v).trim()!=='';
 }
@@ -1999,6 +2094,32 @@ function getRismaMonthlyClosingBonus(month=getLocalDateString().slice(0,7)){
     .reduce((sum,c)=>sum+getRismaClosingBonusForRecord(c),0);
 }
 
+
+function updateRismaFabVisibility(){
+  const rismaFab=$('rismaFabBtn');
+  const mainFab=$('fabBtn');
+  const showRismaFab=currentPage==='risma' && sensitiveHidden;
+  if(rismaFab)rismaFab.style.display=showRismaFab?'grid':'none';
+  if(mainFab)mainFab.style.display=sensitiveHidden?'none':'grid';
+}
+function openRismaTransactionModal(){
+  if(currentPage!=='risma')goPage('risma');
+  const modal=$('rismaTransactionModal');
+  if(!modal)return;
+  const amount=$('rismaAmount');
+  const desc=$('rismaDesc');
+  if(desc)desc.value='';
+  if(amount)amount.value='';
+  const preview=$('rismaAmountPreview');
+  if(preview)preview.innerText='';
+  modal.classList.remove('hidden');
+  setTimeout(()=>amount?.focus(),80);
+}
+function closeRismaTransactionModal(){
+  const modal=$('rismaTransactionModal');
+  if(modal)modal.classList.add('hidden');
+}
+
 function handleRismaAmountPreview(input){
   $('rismaAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):'';
 }
@@ -2094,10 +2215,10 @@ function renderRismaManualClosingPanel(){
     return;
   }
   list.innerHTML=`<div style="background:white;border:1px solid #f9a8d4;border-radius:13px;padding:11px">
-    <div style="font-size:11px;font-weight:900;color:#be185d;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Target Closing</div>
+    <div style="font-size:11px;font-weight:900;color:#be185d;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Target Closing dari Admin</div>
     <div class="small" style="font-weight:800;color:#6b7280;line-height:1.4;margin-bottom:9px">${escapeHtml(targetNames.join(', '))}</div>
     <button class="btn" style="background:linear-gradient(135deg,#be185d,#9d174d);font-size:14px;min-height:45px" onclick="handleRismaManualClosingAll()">🔒 Closing Semua (${pendingTargets.length})</button>
-    <div class="small" style="margin-top:7px;color:#6b7280;line-height:1.35">Sekali klik akan closing semua user yang dipilih admin. Yang sudah closing tidak akan dibuat dobel.</div>
+    <div class="small" style="margin-top:7px;color:#6b7280;line-height:1.35">Sekali klik akan closing semua target valid. Staff yang belum absen otomatis dilewati; karyawan harian tetap diclosing.</div>
   </div>`;
 }
 
@@ -2119,6 +2240,14 @@ function getRismaTargetClosingBonusPerMinute(profile){
   }
   const global=Number(rismaBonusSettings?.closingBonusPerMinute);
   return Number.isFinite(global)&&global>=0?global:DEFAULT_RISMA_CLOSING_BONUS_PER_MINUTE;
+}
+function isRismaTargetClosingEligible(profile, attended){
+  const role=normalizeRismaRole(profile?.role||'staff');
+  if(role==='admin')return false;
+  // Aturan closing manual Risma: harian boleh diclosing tanpa absen,
+  // staff biasa wajib sudah absen hari ini.
+  if(role==='harian')return true;
+  return !!attended;
 }
 async function hasRismaTargetAttendance(username,dateKey=getLocalDateString()){
   if(!firebaseDb)return false;
@@ -2160,6 +2289,7 @@ async function handleRismaManualClosingTarget(username){
   const target=normalizeRismaUsername(username);
   if(!firebaseDb)return showToast('Firebase belum aktif');
   if(!getRismaManualClosingAllowedUsers().includes(target))return showToast('Target ini belum diarahkan admin');
+  if(!(await verifyRismaClosingPin()))return;
   const today=getLocalDateString();
   const existing=await getRismaTargetClosingFromServer(target,today);
   if(existing){
@@ -2171,13 +2301,17 @@ async function handleRismaManualClosingTarget(username){
     const [profile,attended]=await Promise.all([getRismaTargetUserProfile(target),hasRismaTargetAttendance(target,today)]);
     if(profile.active===false||profile.deleted===true||profile.deleted==='true')return showToast('User target nonaktif');
     const role=normalizeRismaRole(profile.role||'staff');
+    if(!isRismaTargetClosingEligible(profile,attended)){
+      renderRismaManualClosingPanel();
+      return showToast(`${profile.name||profile.username||target} belum absen, jadi tidak perlu closing`);
+    }
     const isBonusEligible=role!=='harian'&&role!=='admin'&&attended;
     const delayMinutes=getRismaClosingDelayMinutes();
     const perMinute=getRismaTargetClosingBonusPerMinute(profile);
     const bonus=isBonusEligible?Math.round(delayMinutes*perMinute):0;
     const currentClosingTime=getRismaCurrentWIBTimeLabel();
     const name=profile.name||profile.username||target;
-    const msg=`Closing ${name} sekarang?\nLewat deadline: ${delayMinutes} menit\nBonus closing: ${bonus?formatRupiah(bonus):'Rp 0'}${attended?'':'\nCatatan: user belum absen, bonus Rp 0.'}`;
+    const msg=`Closing ${name} sekarang?\nLewat deadline: ${delayMinutes} menit\nBonus closing: ${bonus?formatRupiah(bonus):'Rp 0'}${role==='harian'?'\nCatatan: karyawan harian boleh diclosing tanpa absen dan bonus closing Rp 0.':''}`;
     if(!confirm(msg))return;
     const docId=getRismaManualClosingDocId(target,today);
     const payload={
@@ -2231,6 +2365,7 @@ async function handleRismaManualClosingAll(){
   if(rismaManualClosingBusy)return showToast('Closing sedang diproses, tunggu sebentar');
   const targets=getRismaManualClosingAllowedUsers();
   if(!targets.length)return showToast('Belum ada arahan closing dari admin');
+  if(!(await verifyRismaClosingPin()))return;
   const today=getLocalDateString();
   rismaManualClosingBusy=true;
   try{
@@ -2248,7 +2383,7 @@ async function handleRismaManualClosingAll(){
       return showToast('Semua arahan admin sudah closing');
     }
     const names=pending.map(getRismaManualClosingTargetName);
-    if(!confirm(`Closing semua arahan admin sekarang?\n\nTarget: ${names.join(', ')}\nTotal: ${pending.length} user`)){
+    if(!confirm(`Closing semua arahan admin sekarang?\n\nTarget: ${names.join(', ')}\nTotal arahan belum closing: ${pending.length} user\n\nCatatan: staff yang belum absen akan otomatis dilewati; karyawan harian tetap diclosing.`)){
       renderRismaManualClosingPanel();
       return;
     }
@@ -2263,6 +2398,11 @@ async function handleRismaManualClosingAll(){
           continue;
         }
         const role=normalizeRismaRole(profile.role||'staff');
+        if(!isRismaTargetClosingEligible(profile,attended)){
+          skipped++;
+          failed.push(`${getRismaManualClosingTargetName(target)} belum absen`);
+          continue;
+        }
         const isBonusEligible=role!=='harian'&&role!=='admin'&&attended;
         const delayMinutes=getRismaClosingDelayMinutes();
         const perMinute=getRismaTargetClosingBonusPerMinute(profile);
@@ -2776,6 +2916,7 @@ async function addRismaTransaction(){
     $('rismaAmount').value='';
     $('rismaDesc').value='';
     $('rismaAmountPreview').innerText='';
+    closeRismaTransactionModal();
     playRismaSuccessSound();
     if(firstTxToday)showRismaFirstTxParty(amount,desc);
     showToast('✅ Penjualan Risma tersimpan!');
@@ -2783,7 +2924,7 @@ async function addRismaTransaction(){
     showToast('Gagal simpan: '+e.message);
     console.error(e);
   }finally{
-    if(btn){btn.disabled=false;btn.innerText='💾 Simpan Penjualan';}
+    if(btn){btn.disabled=false;btn.innerText='💾 Simpan';}
   }
 }
 
