@@ -816,21 +816,34 @@ function getZakatHistory(){return zakatHistory||[]}
 async function loadZakatHistory(){if(!supabaseClient)return[];const{data,error}=await supabaseClient.from('zakat_history').select('*').eq('owner_id',OWNER_ID).order('id',{ascending:true});if(error)throw error;zakatHistory=(data||[]).map(r=>({id:Number(r.id),date:r.date,profitAtPayment:Number(r.profit_at_payment||0),zakatPaid:Number(r.zakat_paid||0),cancelled:!!r.cancelled,cancelledAt:r.cancelled_at,note:r.note||''}));return zakatHistory}
 async function saveZakatHistory(history){zakatHistory=history;if(!supabaseClient)return;const del=await supabaseClient.from('zakat_history').delete().eq('owner_id',OWNER_ID);if(del.error)throw del.error;if(!history.length)return;const rows=history.map(r=>({id:r.id,owner_id:OWNER_ID,date:r.date,profit_at_payment:r.profitAtPayment,zakat_paid:r.zakatPaid,cancelled:!!r.cancelled,cancelled_at:r.cancelledAt||null,note:r.note||''}));const ins=await supabaseClient.from('zakat_history').insert(rows);if(ins.error)throw ins.error}
 function getTotalProfit(){
-  // Basis zakat = 2.5% dari laba bersih (20% dari TOTAL pendapatan: manual + Firebase lock + Firebase hari ini)
+  // Basis zakat = 2.5% dari laba bersih. Di aplikasi ini laba bersih = 20% dari TOTAL pendapatan
+  // manual + arsip Firebase yang sudah sync + omset Firebase hari ini jika belum masuk Supabase.
   let totalIncome=0;
-  transactions.forEach(t=>{if(t.type==='income')totalIncome+=Number(t.amount||0)});
-  // Tambahkan Firebase hari ini jika belum di-sync ke Supabase
+  (transactions||[]).forEach(t=>{if(t&&t.type==='income')totalIncome+=Number(t.amount||0)});
   const today=getLocalDateString();
   const fbToday=Number(todayFirebaseIncomeTotal||0);
   const uploadedTodayTx=getUploadedFirebaseTransaction(today);
   if(fbToday>0&&!uploadedTodayTx)totalIncome+=fbToday;
-  return totalIncome*.2;
+  return Math.round(totalIncome*.2);
 }
-function getTotalProfitZakatPaid(){return getZakatHistory().reduce((a,r)=>a+(!r.cancelled?r.profitAtPayment:0),0)}
-function getUnpaidProfit(){return Math.max(0,getTotalProfit()-getTotalProfitZakatPaid())}
-function getCurrentZakatDue(){return getUnpaidProfit()*.025}
-function validateAndCancelInvalidZakat(){const totalProfit=getTotalProfit();let changed=false;const upd=getZakatHistory().map(r=>{if(!r.cancelled&&r.profitAtPayment>totalProfit){changed=true;return{...r,cancelled:true,cancelledAt:new Date().toISOString()}}return r});if(changed)saveZakatHistory(upd).catch(e=>showToast('Gagal update zakat: '+e.message));return changed}
-async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToast('Zakat sudah lunas');return}const unpaid=getUnpaidProfit();const now=new Date();const ds=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;if(confirm(`Bayar Zakat Mal:\n2.5% × ${formatRupiah(unpaid)} (laba belum dizakatkan)\n= ${formatRupiah(due)}\n\nLanjutkan?`)){const h=getZakatHistory();h.push({id:Date.now(),date:ds,profitAtPayment:unpaid,zakatPaid:due,cancelled:false,note:`Zakat 2.5% dari laba ${formatRupiah(unpaid)}`});try{await saveZakatHistory(h);render();showToast('Zakat tersimpan')}catch(e){showToast('Gagal simpan zakat: '+e.message)}}}
+function getTotalProfitZakatPaid(){return getZakatHistory().reduce((a,r)=>a+(!r.cancelled?Math.round(Number(r.profitAtPayment||0)):0),0)}
+function getUnpaidProfit(){return Math.max(0,Math.round(getTotalProfit()-getTotalProfitZakatPaid()))}
+function getCurrentZakatDue(){return Math.round(getUnpaidProfit()*.025)}
+function getWibDateTimeString(){const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`}
+function validateAndCancelInvalidZakat(){
+  const totalProfit=getTotalProfit();
+  let covered=0,changed=false;
+  const upd=getZakatHistory().map(r=>{
+    if(r.cancelled)return r;
+    const profit=Math.max(0,Math.round(Number(r.profitAtPayment||0)));
+    if(covered+profit>totalProfit){changed=true;return{...r,cancelled:true,cancelledAt:new Date().toISOString(),note:r.note||'Auto batal karena laba terkini lebih kecil dari laba yang sudah dizakatkan'}}
+    covered+=profit;
+    return r;
+  });
+  if(changed)saveZakatHistory(upd).catch(e=>showToast('Gagal update zakat: '+e.message));
+  return changed;
+}
+async function markZakatPaid(){const due=getCurrentZakatDue();if(due<=0){showToast('Zakat sudah lunas');return}const unpaid=getUnpaidProfit();const ds=getWibDateTimeString();if(confirm(`Bayar Zakat Mal:\n2.5% × ${formatRupiah(unpaid)} (laba belum dizakatkan)\n= ${formatRupiah(due)}\n\nLanjutkan?`)){const h=getZakatHistory();h.push({id:Date.now(),date:ds,profitAtPayment:unpaid,zakatPaid:due,cancelled:false,note:`Zakat 2.5% dari laba ${formatRupiah(unpaid)}`});try{await saveZakatHistory(h);render();showToast('Zakat tersimpan')}catch(e){showToast('Gagal simpan zakat: '+e.message)}}}
 function showZakatHistoryModal(){const h=getZakatHistory(),box=$('zakatHistoryList');box.innerHTML=h.length?h.slice().reverse().map(r=>`<div class="item ${r.cancelled?'danger-card':''}"><div class="desc"><b>${r.date} ${r.cancelled?'(Batal)':''}</b><small>Dari laba ${formatRupiah(r.profitAtPayment)}</small></div><b class="num ${r.cancelled?'red':'gold'}">${formatRupiah(r.zakatPaid)}</b></div>`).join(''):'<div class="empty">Belum ada riwayat zakat</div>';$('zakatHistoryModal').classList.remove('hidden')}
 function closeZakatHistoryModal(){$('zakatHistoryModal').classList.add('hidden')}
 async function loadTransactions(){
@@ -986,7 +999,7 @@ function getFilteredTransactions(){
   return transactions.filter(t=>currentFilter==='month'?t.date.startsWith(now.substring(0,7)):currentFilter==='range'?t.date>=s&&t.date<=e:true)
 }
 function getPeriodLabel(){const now=getLocalDateString();if(currentFilter==='today')return `Hari Ini (${now})`;if(currentFilter==='month')return `Bulan Ini`;if(currentFilter==='range')return `${$('filterStartDate').value} s.d ${$('filterEndDate').value}`;return 'Semua Riwayat'}
-function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else if(!isCashOut(t)){te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN Risma*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan: ${formatRupiah(ti)}\n❤️ Pengeluaran: ${formatRupiah(te)}\n💙 Saldo: ${formatRupiah(ti-te)}\n💜 Laba 20% (Manual+Firebase): ${formatRupiah(labaTotal)}\n🕌 Zakat wajib (2.5% laba): ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari Risma Finance_'}
+function generateWhatsAppReport(){const f=getFilteredTransactions();let ti=0,te=0,inc=[],exp=[];f.forEach(t=>{if(t.type==='income'){ti+=t.amount;inc.push(`📥 ${t.date} | ${t.description} | +${formatRupiah(t.amount)}`)}else if(!isCashOut(t)){te+=t.amount;exp.push(`📤 ${t.date} | ${t.description} | -${formatRupiah(t.amount)}`)}});const labaTotal=getTotalProfit();const unpaid=getUnpaidProfit();const zakatDue=getCurrentZakatDue();let r=`📊 *LAPORAN Risma*\nPeriode: ${getPeriodLabel()}\n\n💚 Pemasukan periode ini: ${formatRupiah(ti)}\n❤️ Pengeluaran periode ini: ${formatRupiah(te)}\n💙 Saldo periode ini: ${formatRupiah(ti-te)}\n💜 Laba 20% total kumulatif: ${formatRupiah(labaTotal)}\n🧾 Laba belum dizakatkan: ${formatRupiah(unpaid)}\n🕌 Zakat belum dibayar: ${formatRupiah(zakatDue)}\n\n`;if(inc.length)r+=`*PEMASUKAN*\n${inc.join('\n')}\n\n`;if(exp.length)r+=`*PENGELUARAN*\n${exp.join('\n')}\n\n`;return r+'_Dikirim dari Risma Finance_'}
 function sendWhatsAppReport(){if(!getFilteredTransactions().length){showToast('Tidak ada transaksi');return}const no=prompt('Nomor WhatsApp tujuan. Kosongkan untuk copy laporan.','');const report=generateWhatsAppReport();if(no&&no.trim()){let n=no.replace(/[^0-9]/g,'');if(n.startsWith('0'))n='62'+n.slice(1);if(!n.startsWith('62'))n='62'+n;window.open(`https://wa.me/${n}?text=${encodeURIComponent(report)}`,'_blank');showToast('Membuka WhatsApp')}else{navigator.clipboard.writeText(report).then(()=>showToast('Laporan disalin')).catch(()=>showToast('Gagal salin'))}}
 
 function isFirebaseUploaded(t){return !!(t&&t.__firebasePreview) || String(t?.description||'').startsWith('[FIREBASE:')}
@@ -1760,8 +1773,11 @@ function downloadXlsMonth(){
   // Hitung ringkasan
   const totalIncome=monthTx.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount||0),0);
   const totalExpense=monthTx.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount||0),0);
-  const laba20=totalIncome*0.2;
-  const zakatDue=laba20*0.025;
+  const laba20=Math.round(totalIncome*0.2);
+  const zakatBulanIni=Math.round(laba20*0.025);
+  const labaKumulatif=getTotalProfit();
+  const labaBelumDizakatkan=getUnpaidProfit();
+  const zakatDue=getCurrentZakatDue();
   const saldoBersih=totalIncome-totalExpense;
 
   // Format currency tanpa simbol
@@ -1780,8 +1796,11 @@ function downloadXlsMonth(){
     ['Total Pendapatan',totalIncome],
     ['Total Pengeluaran',totalExpense],
     ['Saldo Bersih',saldoBersih],
-    ['Laba Bersih (20% Pendapatan)',laba20],
-    ['Zakat Wajib (2.5% Laba)',zakatDue],
+    ['Laba Bulan Ini (20% Pendapatan)',laba20],
+    ['Estimasi Zakat Bulan Ini (2.5% Laba Bulan)',zakatBulanIni],
+    ['Laba Kumulatif Aplikasi',labaKumulatif],
+    ['Laba Belum Dizakatkan',labaBelumDizakatkan],
+    ['Zakat Belum Dibayar (Kumulatif)',zakatDue],
     [],
     ['RIWAYAT ZAKAT BULAN INI'],
     ['Tanggal','Dari Laba (Rp)','Zakat Dibayar (Rp)','Status'],
@@ -1821,7 +1840,7 @@ function downloadXlsMonth(){
     ['','','','TOTAL PENGELUARAN',totalExpense,''],
     ['','','','SALDO BERSIH',saldoBersih,''],
     ['','','','LABA 20%',laba20,''],
-    ['','','','ZAKAT 2.5%',zakatDue,''],
+    ['','','','ZAKAT BELUM DIBAYAR',zakatDue,''],
   ];
   const wsDet=XLSX.utils.aoa_to_sheet(detailAll);
   wsDet['!cols']=[{wch:5},{wch:13},{wch:38},{wch:14},{wch:20},{wch:10}];
