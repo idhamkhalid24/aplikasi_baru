@@ -254,6 +254,41 @@
     .staff-summary-readonly{font-size:10px;border-radius:999px;padding:4px 8px;font-weight:950;background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;white-space:nowrap}
     @media(max-width:360px){.staff-summary-row{grid-template-columns:1fr;gap:7px}.staff-summary-right{text-align:left;padding-left:43px}.staff-summary-hero .value{font-size:22px}}
 
+    /* === STAFF PAGE COMPACT ANDROID === */
+    #pageStaffDaily{padding-top:0}
+    #pageStaffDaily .staff-summary-hero{border-radius:14px!important;padding:10px 11px!important;margin-bottom:7px!important}
+    #pageStaffDaily .staff-summary-hero .label{font-size:9.5px!important;line-height:1.15!important;letter-spacing:.35px!important}
+    #pageStaffDaily .staff-summary-hero .value{font-size:21px!important;margin:3px 0 2px!important;line-height:1.08!important}
+    #pageStaffDaily .staff-summary-hero .mini{font-size:10px!important;line-height:1.2!important}
+    #pageStaffDaily > .grid2{gap:7px!important;margin-bottom:7px!important}
+    #pageStaffDaily .stat{padding:8px!important;border-radius:12px!important;min-height:58px!important}
+    #pageStaffDaily .stat span{font-size:9px!important;line-height:1.1!important}
+    #pageStaffDaily .stat b{font-size:13px!important;margin-top:3px!important;line-height:1.12!important}
+    #pageStaffDaily #staffSummaryTotalBonus{font-size:15px!important}
+    #pageStaffDaily #staffSummaryTopSellerName{font-size:12.5px!important;margin-top:2px!important}
+    #pageStaffDaily #staffSummaryTopSellerMeta,#pageStaffDaily #staffSummaryUpdated{font-size:9.5px!important;margin-top:2px!important;line-height:1.15!important}
+    #pageStaffDaily > .card{padding:9px!important;border-radius:14px!important;margin-bottom:7px!important}
+    #pageStaffDaily > .card > div:first-child{margin-bottom:6px!important}
+    #pageStaffDaily > .card > div:first-child b{font-size:12px!important}
+    #pageStaffDaily > .card > div:first-child .small{font-size:9.5px!important;line-height:1.2!important}
+    #pageStaffDaily > .card .tab{font-size:9.5px!important;padding:4px 8px!important;min-height:28px!important}
+    #pageStaffDaily .staff-summary-list{gap:5px!important;max-height:62vh!important}
+    #pageStaffDaily .staff-summary-row{border-radius:12px!important;padding:7px 8px!important;gap:7px!important}
+    #pageStaffDaily .staff-summary-left{gap:7px!important}
+    #pageStaffDaily .staff-summary-avatar{width:27px!important;height:27px!important;flex-basis:27px!important;border-radius:10px!important;font-size:12px!important}
+    #pageStaffDaily .staff-summary-name{font-size:12px!important;line-height:1.15!important}
+    #pageStaffDaily .staff-summary-meta{font-size:9.5px!important;line-height:1.2!important;margin-top:1px!important}
+    #pageStaffDaily .staff-summary-role{display:none!important}
+    #pageStaffDaily .staff-summary-right{line-height:1.15!important}
+    #pageStaffDaily .staff-summary-money{font-size:12px!important}
+    #pageStaffDaily .staff-summary-bonus{font-size:10px!important;margin-top:2px!important}
+    @media(max-width:360px){
+      #pageStaffDaily .staff-summary-row{grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important}
+      #pageStaffDaily .staff-summary-right{text-align:right!important;padding-left:0!important}
+      #pageStaffDaily .staff-summary-hero .value{font-size:19px!important}
+      #pageStaffDaily .stat{padding:7px!important}
+    }
+
     /* === CATATAN HOME STAFF & HARIAN DI HALAMAN RISMA === */
     .risma-staff-note-card{
       background:linear-gradient(135deg,#ecfdf5,#fff7fb)!important;
@@ -802,20 +837,6 @@
 
     <!-- ===== HALAMAN RINGKASAN STAFF & HARIAN (READ ONLY) ===== -->
     <section id="pageStaffDaily" class="page">
-      <div class="card staff-summary-card" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <div style="min-width:0">
-            <div class="section-title" style="margin:0 0 3px;color:#7c3aed">👥 Staff & Harian</div>
-            <b style="font-size:15px">Ringkasan Pendapatan Hari Ini</b>
-            <div class="small" style="margin-top:2px;line-height:1.35">Read only · data langsung dari index Firebase</div>
-          </div>
-          <div style="text-align:right">
-            <div id="staffSummaryDateBadge" class="chip" style="background:#f5f3ff;color:#7c3aed;border-color:#ddd6fe;font-size:11px"></div>
-            <div id="staffSummaryStatus" class="small" style="margin-top:5px;font-weight:900;color:#7c3aed">⏳ Memuat...</div>
-          </div>
-        </div>
-      </div>
-
       <div class="staff-summary-hero">
         <div class="label">Total Pendapatan Staff + Harian Hari Ini</div>
         <div id="staffSummaryTotalIncome" class="value num">Rp 0</div>
