@@ -831,9 +831,10 @@
           <b id="staffSummaryTotalBonus" class="num" style="color:#15803d;font-size:18px">Rp 0</b>
         </div>
         <div class="stat" style="border-color:#ddd6fe;background:white;box-shadow:none">
-          <span>Status Data</span>
-          <b class="num" style="color:#7c3aed;font-size:13px">READ ONLY</b>
-          <div id="staffSummaryUpdated" class="small" style="margin-top:4px">Realtime dari index</div>
+          <span>User Penjualan Tertinggi</span>
+          <b id="staffSummaryTopSellerName" style="color:#7c3aed;font-size:14px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">-</b>
+          <div id="staffSummaryTopSellerMeta" class="small" style="margin-top:4px;font-weight:900;color:#7c3aed">Belum ada penjualan</div>
+          <div id="staffSummaryUpdated" class="small" style="margin-top:3px">Realtime dari index</div>
         </div>
       </div>
 
@@ -3249,10 +3250,13 @@ function renderStaffDailySummary(){
   const totalIncome=rows.reduce((sum,r)=>sum+Number(r.income||0),0);
   const totalBonus=rows.reduce((sum,r)=>sum+Number(r.bonus||0),0);
   const totalTx=rows.reduce((sum,r)=>sum+Number(r.txCount||0),0);
+  const topSeller=rows.filter(r=>Number(r.income||0)>0).sort((a,b)=>Number(b.income||0)-Number(a.income||0)||Number(b.txCount||0)-Number(a.txCount||0)||String(a.name||a.username).localeCompare(String(b.name||b.username),'id'))[0]||null;
   if($('staffSummaryTotalIncome'))$('staffSummaryTotalIncome').innerText=formatRupiah(totalIncome);
   if($('staffSummaryTotalBonus'))$('staffSummaryTotalBonus').innerText=formatRupiah(totalBonus);
   if($('staffSummaryTotalUsers'))$('staffSummaryTotalUsers').innerText=rows.length;
   if($('staffSummaryTotalTx'))$('staffSummaryTotalTx').innerText=totalTx;
+  if($('staffSummaryTopSellerName'))$('staffSummaryTopSellerName').innerText=topSeller?String(topSeller.name||topSeller.username||'-'):'-';
+  if($('staffSummaryTopSellerMeta'))$('staffSummaryTopSellerMeta').innerText=topSeller?`${formatRupiah(topSeller.income)} · ${Number(topSeller.txCount||0)} trx`:'Belum ada penjualan';
   const loaded=staffDailySummaryLoaded.users||staffDailySummaryLoaded.tx||staffDailySummaryLoaded.manual||staffDailySummaryLoaded.closing;
   if($('staffSummaryStatus'))$('staffSummaryStatus').innerText=firebaseDb?(loaded?'✅ Live':'⏳ Memuat...'):'❌ Firebase mati';
   if($('staffSummaryUpdated'))$('staffSummaryUpdated').innerText=loaded?`Update ${new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jakarta'}).replace('.',':')}`:'Menunggu data index';
