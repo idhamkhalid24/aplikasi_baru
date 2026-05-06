@@ -83,6 +83,22 @@
     .pin-key:active{background:var(--green);color:white;transform:scale(.93)}
 
     /* === HIDE SENSITIVE DATA TOGGLE === */
+
+    /* === REFRESH DATA GLOBAL === */
+    .refresh-data-btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      background:#eef6ff;color:#2563eb;
+      border:1px solid #bfdbfe;border-radius:50%;
+      width:36px;height:36px;
+      cursor:pointer;flex-shrink:0;
+      font-size:18px;font-weight:950;line-height:1;
+      box-shadow:0 2px 8px rgba(37,99,235,.18);
+    }
+    .refresh-data-btn:active{opacity:.85;transform:scale(.93)}
+    .refresh-data-btn:disabled{opacity:.58;cursor:not-allowed}
+    .refresh-data-btn.refreshing{animation:refreshDataSpin .75s linear infinite}
+    @keyframes refreshDataSpin{to{transform:rotate(360deg)}}
+
     .hide-toggle-btn{
       display:inline-flex;align-items:center;justify-content:center;
       background:var(--green);color:white;
@@ -835,6 +851,7 @@
     <div class="top">
       <div class="brand">
         <div><h1 style="margin:0;font-size:17px">Risma</h1><small style="display:block;color:var(--muted);font-size:11px;margin-top:2px">Finance & Zakat</small></div>
+        <button id="btnRefreshData" onclick="refreshAllData()" class="refresh-data-btn" title="Refresh data" aria-label="Refresh data">↻</button>
         <button id="hideToggleBtn" onclick="toggleSensitiveData()" class="hide-toggle-btn" title="Sembunyikan/tampilkan data sensitif">
           <svg id="hideIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
         </button>
@@ -4071,6 +4088,181 @@ async function deleteRismaTransaction(docId){
 
 window.closeRismaFirstTxParty=closeRismaFirstTxParty;
 window.closeRismaManualBonusParty=closeRismaManualBonusParty;
+
+
+// =====================================================
+// REFRESH DATA GLOBAL — tidak menghapus listener lama
+// =====================================================
+let refreshAllDataBusy=false;
+function setRefreshDataBusy(active){
+  const btn=$('btnRefreshData');
+  if(!btn)return;
+  btn.disabled=!!active;
+  btn.classList.toggle('refreshing',!!active);
+}
+function setRefreshStatus(text,bg,color){
+  const st=$('statusText'),sb=$('statusBadge');
+  if(st&&text)st.innerText=text;
+  if(sb){
+    if(bg)sb.style.background=bg;else sb.style.background='';
+    if(color)sb.style.color=color;else sb.style.color='';
+  }
+}
+async function getFirebaseFreshSnapshot(queryRef){
+  try{return await queryRef.get({source:'server'});}catch(e){
+    console.warn('Refresh server Firebase gagal, pakai fallback cache/realtime:',e);
+    return await queryRef.get();
+  }
+}
+async function refreshCoreFirebaseDataOnce(){
+  if(!firebaseDb)return;
+  const today=getLocalDateString();
+  const uploadDate=firebaseUploadDate||today;
+  const jobs=[];
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('dateKey','==',today)).then(snap=>{
+    todayFirebaseIncomeRows=normalizeFirebaseRows(snap.docs.map(d=>({id:d.id,_docId:d.id,...d.data()}))).filter(t=>t.dateKey===today);
+    todayFirebaseIncomeTotal=sumFirebaseRows(todayFirebaseIncomeRows);
+  }));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('dateKey','==',uploadDate)).then(snap=>{
+    firebaseIncomeRows=normalizeFirebaseRows(snap.docs.map(d=>({id:d.id,_docId:d.id,...d.data()}))).filter(t=>t.dateKey===uploadDate);
+    firebaseIncomeTotal=sumFirebaseRows(firebaseIncomeRows);
+  }));
+  await Promise.allSettled(jobs);
+}
+async function refreshRismaFirebaseDataOnce(){
+  if(!firebaseDb)return;
+  const today=getLocalDateString();
+  const month=today.slice(0,7);
+  const jobs=[];
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('dateKey','==',today).where('user','==',RISMA_USERNAME)).then(snap=>{
+    rismaTodayRows=normalizeRismaRows(snap.docs.map(d=>({_docId:d.id,id:d.id,...d.data()}))).filter(t=>t.dateKey===today);
+  }).catch(async()=>{
+    const snap=await getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('dateKey','==',today));
+    rismaTodayRows=normalizeRismaRows(snap.docs.map(d=>({_docId:d.id,id:d.id,...d.data()}))).filter(t=>t.dateKey===today);
+  }));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('monthKey','==',month).where('user','==',RISMA_USERNAME)).then(snap=>{
+    rismaMonthRows=normalizeRismaRows(snap.docs.map(d=>({_docId:d.id,id:d.id,...d.data()}))).filter(t=>String(t.dateKey||'').startsWith(month));
+  }).catch(async()=>{
+    const snap=await getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('dateKey','>=',month+'-01').where('dateKey','<=',month+'-31'));
+    rismaMonthRows=normalizeRismaRows(snap.docs.map(d=>({_docId:d.id,id:d.id,...d.data()}))).filter(t=>String(t.dateKey||'').startsWith(month));
+  }));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('closings').where('monthKey','==',month)).then(snap=>{
+    rismaClosingRows=snap.docs.map(d=>({_docId:d.id,...(d.data()||{})})).filter(c=>c._docId!=='__bonus_settings'&&c.dateKey!=='__bonus_settings'&&c.type!=='bonus_settings');
+  }).catch(async()=>{
+    const snap=await getFirebaseFreshSnapshot(firebaseDb.collection('closings'));
+    rismaClosingRows=snap.docs.map(d=>({_docId:d.id,...(d.data()||{})})).filter(c=>c._docId!=='__bonus_settings'&&c.dateKey!=='__bonus_settings'&&c.type!=='bonus_settings'&&normalizeRismaMonthKey(c.monthKey||c.dateKey)===month);
+  }));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('manualBonuses').where('monthKey','==',month)).then(snap=>{
+    rismaManualBonusRows=snap.docs.map(d=>({_docId:d.id,id:d.id,...(d.data()||{})})).filter(isRismaManualBonus);
+  }));
+  jobs.push(firebaseDb.collection('users').doc(RISMA_USERNAME).get({source:'server'}).then(doc=>{
+    if(doc.exists){
+      const data=doc.data()||{};
+      const role=normalizeRismaRole(data.role||'staff');
+      rismaUserProfile={_docId:doc.id,username:data.username||doc.id,...data,role,closingBonusPerMinute:(role==='harian'||role==='admin')?0:data.closingBonusPerMinute};
+    }else rismaUserProfile=null;
+  }).catch(e=>console.warn('Refresh user Risma gagal:',e)));
+  jobs.push(firebaseDb.collection('closings').doc('__bonus_settings').get({source:'server'}).then(doc=>{
+    if(doc.exists){
+      const data=doc.data()||{};
+      rismaBonusSettings={
+        transactionBonusRate:Number.isFinite(Number(data.transactionBonusRate))?Number(data.transactionBonusRate):DEFAULT_RISMA_BONUS_RATE,
+        closingBonusPerMinute:Number.isFinite(Number(data.closingBonusPerMinute))?Number(data.closingBonusPerMinute):DEFAULT_RISMA_CLOSING_BONUS_PER_MINUTE,
+        updatedAtMs:Number(data.updatedAtMs||0),
+        updatedByName:data.updatedByName||''
+      };
+    }else rismaBonusSettings={transactionBonusRate:DEFAULT_RISMA_BONUS_RATE,closingBonusPerMinute:DEFAULT_RISMA_CLOSING_BONUS_PER_MINUTE};
+  }).catch(e=>console.warn('Refresh bonus settings Risma gagal:',e)));
+  jobs.push(firebaseDb.collection('closings').doc('__risma_manual_closing').get({source:'server'}).then(doc=>{
+    rismaManualClosingConfig=doc.exists?{id:doc.id,enabled:true,allowedUsers:[],allowedNames:{},...(doc.data()||{})}:{id:RISMA_USERNAME,enabled:true,allowedUsers:[],allowedNames:{}};
+  }).catch(e=>console.warn('Refresh closing manual Risma gagal:',e)));
+  jobs.push(firebaseDb.collection('closings').doc(STAFF_DAILY_NOTE_DOC_ID).get({source:'server'}).then(doc=>{
+    rismaStaffDailyHomeNote=doc.exists?{id:doc.id,note:DEFAULT_STAFF_DAILY_NOTE,enabled:true,updatedAtMs:0,updatedBy:'',updatedByName:'',...(doc.data()||{})}:{id:STAFF_DAILY_NOTE_DOC_ID,note:DEFAULT_STAFF_DAILY_NOTE,enabled:true,updatedAtMs:0,updatedBy:'',updatedByName:''};
+  }).catch(e=>console.warn('Refresh catatan staff gagal:',e)));
+  await Promise.allSettled(jobs);
+}
+async function refreshStaffDailyFirebaseDataOnce(){
+  if(!firebaseDb)return;
+  const today=getLocalDateString();
+  const month=today.slice(0,7);
+  const jobs=[];
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('users')).then(snap=>{staffDailyUsers=snap.docs.map(d=>({_docId:d.id,id:d.id,...(d.data()||{})}));staffDailySummaryLoaded.users=true;}));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('transactions').where('dateKey','==',today)).then(snap=>{staffDailyTxRows=normalizeFirebaseRows(snap.docs.map(d=>({_docId:d.id,id:d.id,...(d.data()||{})})));staffDailySummaryLoaded.tx=true;}));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('manualBonuses').where('monthKey','==',month)).then(snap=>{staffDailyManualRows=snap.docs.map(d=>({_docId:d.id,id:d.id,...(d.data()||{})})).filter(b=>getStaffManualBonusDate(b)===today&&!isFirebaseRecordDeleted(b));staffDailySummaryLoaded.manual=true;}));
+  jobs.push(getFirebaseFreshSnapshot(firebaseDb.collection('closings').where('dateKey','==',today)).then(snap=>{staffDailyClosingRows=snap.docs.map(d=>({_docId:d.id,id:d.id,...(d.data()||{})})).filter(c=>c._docId!=='__bonus_settings'&&c.type!=='bonus_settings');staffDailySummaryLoaded.closing=true;}));
+  await Promise.allSettled(jobs);
+}
+function restartRismaRealtimeWatchesOnly(){
+  if(rismaFirebaseUnsub){rismaFirebaseUnsub();rismaFirebaseUnsub=null;}
+  if(rismaMonthFirebaseUnsub){rismaMonthFirebaseUnsub();rismaMonthFirebaseUnsub=null;}
+  if(rismaClosingUnsub){rismaClosingUnsub();rismaClosingUnsub=null;}
+  if(rismaManualBonusUnsub){rismaManualBonusUnsub();rismaManualBonusUnsub=null;}
+  if(rismaManualClosingUnsub){rismaManualClosingUnsub();rismaManualClosingUnsub=null;}
+  if(rismaStaffDailyNoteUnsub){rismaStaffDailyNoteUnsub();rismaStaffDailyNoteUnsub=null;}
+  if(rismaBonusSettingsUnsub){rismaBonusSettingsUnsub();rismaBonusSettingsUnsub=null;}
+  if(rismaUserUnsub){rismaUserUnsub();rismaUserUnsub=null;}
+  startRismaUserWatch();
+  startRismaFirebaseWatch();
+  startRismaMonthWatch();
+  startRismaClosingWatch();
+  startRismaManualClosingWatch();
+  startRismaStaffDailyHomeNoteWatch();
+  startRismaManualBonusWatch();
+  startRismaBonusSettingsWatch();
+}
+async function refreshAllData(){
+  if(refreshAllDataBusy)return;
+  refreshAllDataBusy=true;
+  setRefreshDataBusy(true);
+  setRefreshStatus('Refresh...','#e0f2fe','#0369a1');
+  try{
+    if(!supabaseClient&&isSupabaseConfigured())initSupabase();
+    const supabaseJobs=[];
+    if(supabaseClient){
+      supabaseJobs.push(loadTransactions());
+      supabaseJobs.push(loadZakatHistory());
+    }
+    await Promise.allSettled(supabaseJobs);
+
+    if(!firebaseDb)initFirebase();
+    if(firebaseDb){
+      await refreshCoreFirebaseDataOnce();
+      startFirebaseWatch(firebaseUploadDate||getLocalDateString());
+      await Promise.race([startTodayFirebaseWatch(),new Promise(r=>setTimeout(r,3200))]);
+
+      if(currentPage==='risma'){
+        await refreshRismaFirebaseDataOnce();
+        restartRismaRealtimeWatchesOnly();
+        renderRismaToday();
+        renderRismaMonthBonus();
+        renderRismaManualClosingPanel();
+        renderRismaStaffDailyHomeNoteCard();
+      }
+      if(currentPage==='staffDaily'){
+        await refreshStaffDailyFirebaseDataOnce();
+        clearStaffDailySummaryWatch();
+        startRismaBonusSettingsWatch();
+        startStaffDailySummaryWatch();
+        renderStaffDailySummary();
+      }
+      if(currentPage==='firebase')renderFirebaseUploadCard();
+    }
+
+    render();
+    renderCashFisik();
+    setRefreshStatus('Aman','','');
+    showToast('Data berhasil direfresh');
+  }catch(e){
+    console.error(e);
+    render();
+    renderCashFisik();
+    setRefreshStatus('Error','#fff0ee','#c0392b');
+    showToast('Refresh gagal: '+(e.message||e),6000);
+  }finally{
+    setRefreshDataBusy(false);
+    refreshAllDataBusy=false;
+  }
+}
 
 async function initApp(){try{if(!initSupabase())return;
   // Tampilkan loading saat fetch Supabase
