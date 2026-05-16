@@ -750,6 +750,49 @@
       #pageStaffDaily .staff-summary-list{max-height:calc(100dvh - 340px)!important;min-height:150px!important}
     }
 
+
+
+    /* === KEYBOARD SAFE MODALS: TRANSAKSI + BARANG KOSONG === */
+    #transactionModal.keyboard-safe-modal,
+    #rismaTransactionModal.keyboard-safe-modal,
+    #storeEmptyStockModal.keyboard-safe-modal{
+      align-items:flex-start!important;
+      justify-content:center!important;
+      overflow-y:auto!important;
+      overscroll-behavior:contain!important;
+      -webkit-overflow-scrolling:touch!important;
+      padding:calc(10px + env(safe-area-inset-top,0px)) 12px calc(14px + env(safe-area-inset-bottom,0px))!important;
+    }
+    #transactionModal.keyboard-safe-modal .keyboard-safe-box,
+    #rismaTransactionModal.keyboard-safe-modal .keyboard-safe-box,
+    #storeEmptyStockModal.keyboard-safe-modal .keyboard-safe-box{
+      margin:0 auto 18px!important;
+      max-height:calc(100dvh - 26px)!important;
+      overflow-y:auto!important;
+      overscroll-behavior:contain!important;
+      -webkit-overflow-scrolling:touch!important;
+      scroll-padding-bottom:120px!important;
+    }
+    body.keyboard-open #transactionModal.keyboard-safe-modal,
+    body.keyboard-open #rismaTransactionModal.keyboard-safe-modal,
+    body.keyboard-open #storeEmptyStockModal.keyboard-safe-modal{
+      padding-top:8px!important;
+      padding-bottom:8px!important;
+    }
+    body.keyboard-open #transactionModal.keyboard-safe-modal .keyboard-safe-box,
+    body.keyboard-open #rismaTransactionModal.keyboard-safe-modal .keyboard-safe-box,
+    body.keyboard-open #storeEmptyStockModal.keyboard-safe-modal .keyboard-safe-box{
+      max-height:calc(100dvh - 16px)!important;
+    }
+    @supports(height:100svh){
+      #transactionModal.keyboard-safe-modal .keyboard-safe-box,
+      #rismaTransactionModal.keyboard-safe-modal .keyboard-safe-box,
+      #storeEmptyStockModal.keyboard-safe-modal .keyboard-safe-box{max-height:calc(100svh - 26px)!important}
+      body.keyboard-open #transactionModal.keyboard-safe-modal .keyboard-safe-box,
+      body.keyboard-open #rismaTransactionModal.keyboard-safe-modal .keyboard-safe-box,
+      body.keyboard-open #storeEmptyStockModal.keyboard-safe-modal .keyboard-safe-box{max-height:calc(100svh - 16px)!important}
+    }
+
   </style>
 </head>
 <body>
@@ -936,7 +979,31 @@
       </div>
     </section>
 
-    <div id="transactionModal" class="modal hidden"><div class="box"><h3 style="margin:0 0 12px;text-align:center">Input Transaksi</h3><div class="row"><div class="field"><input type="date" id="inputDate"></div><div class="field"><select id="type" onchange="updatePlaceholder()"><option value="income">Pemasukan</option><option value="expense">Pengeluaran</option></select></div></div><div class="field"><input type="text" id="description" placeholder="Deskripsi"></div><div class="field amount-wrap"><input type="number" id="amount" placeholder="Nominal" oninput="handleSmartAmount(this)"><span id="liveAmountPreview" class="preview"></span></div><div class="row"><button class="btn secondary" onclick="closeTransactionModal()">Batal</button><button class="btn" onclick="addTransaction()">Simpan</button></div><p class="small" style="margin-bottom:0">Catatan: nominal otomatis dikali 1.000 seperti versi sebelumnya.</p></div></div>
+    <div id="transactionModal" class="modal hidden keyboard-safe-modal"><div class="box keyboard-safe-box"><h3 style="margin:0 0 12px;text-align:center">Input Transaksi</h3><div class="row"><div class="field"><input type="date" id="inputDate"></div><div class="field"><select id="type" onchange="updatePlaceholder()"><option value="income">Pemasukan</option><option value="expense">Pengeluaran</option></select></div></div><div class="field"><input type="text" id="description" placeholder="Deskripsi"></div><div class="field amount-wrap"><input type="number" id="amount" placeholder="Nominal" oninput="handleSmartAmount(this)"><span id="liveAmountPreview" class="preview"></span></div><div class="row"><button class="btn secondary" onclick="closeTransactionModal()">Batal</button><button class="btn" onclick="addTransaction()">Simpan</button></div><p class="small" style="margin-bottom:0">Catatan: nominal otomatis dikali 1.000 seperti versi sebelumnya.</p></div></div>
+
+    <div id="storeEmptyStockModal" class="modal hidden keyboard-safe-modal"><div class="box keyboard-safe-box" style="max-width:410px;width:100%">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:12px">
+        <div>
+          <h3 style="margin:0;font-size:17px;color:#7c5f13">Barang Kosong</h3>
+          <small style="color:var(--muted);font-size:11px;font-weight:800">Kirim ke halaman Kiriman Staff di Belanjaku sebagai Risma</small>
+        </div>
+        <button class="x" style="font-size:24px;padding:4px 6px" onclick="closeStoreEmptyStockModal()">×</button>
+      </div>
+      <div style="background:#fff8e5;border:1px solid #f2df9b;border-radius:16px;padding:12px;margin-bottom:10px">
+        <div class="field"><input type="text" id="storeEmptyStockName" autocomplete="off" placeholder="Nama barang, contoh: Pasmina Ceruty"></div>
+        <div class="field"><input type="text" id="storeEmptyStockColor" autocomplete="off" placeholder="Warna / motif, contoh: Milo"></div>
+        <div class="row">
+          <div class="field"><input type="tel" inputmode="numeric" pattern="[0-9]*" id="storeEmptyStockQty" value="1" placeholder="Qty"></div>
+          <div class="field"><input type="text" id="storeEmptyStockSupplier" autocomplete="off" placeholder="Supplier (opsional)"></div>
+        </div>
+        <div class="field" style="margin-bottom:0"><input type="text" id="storeEmptyStockNote" autocomplete="off" placeholder="Catatan (opsional)"></div>
+      </div>
+      <div class="small" style="font-weight:800;line-height:1.45;margin-bottom:10px;color:#7c5f13">Barang tidak langsung masuk list belanja. Owner tetap tekan <b>Tambahkan ke Keranjang</b> dari Belanjaku.</div>
+      <div class="row">
+        <button class="btn secondary" onclick="closeStoreEmptyStockModal()">Batal</button>
+        <button class="btn gold" onclick="submitStoreEmptyStock()">Kirim</button>
+      </div>
+    </div></div>
 
     <section id="pageHistory" class="page sensitive-wrap-history">
       <div id="netSummaryCard" class="summary-net-card">
@@ -1042,6 +1109,17 @@
         </div>
       </div>
 
+      <!-- Kirim Barang Kosong Risma ke Belanjaku -->
+      <div class="card" style="background:linear-gradient(135deg,#fff8e5,#ffffff);border-color:#f2df9b;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div style="min-width:0;flex:1">
+            <div class="section-title" style="margin:0 0 3px;color:#7c5f13">📦 Barang Kosong Risma</div>
+            <b style="font-size:14px">Kirim nama barang + warna</b>
+            <div class="small" style="margin-top:2px;color:#7c5f13;font-weight:800">pengirimnya Risma</div>
+          </div>
+          <button class="btn gold" type="button" onclick="openStoreEmptyStockModal()" style="width:auto;min-width:100px;padding:10px;border-radius:13px">Laporkan</button>
+        </div>
+      </div>
 
       <!-- Penting dari Admin -->
       <div id="rismaStaffDailyHomeNoteCard" class="card risma-staff-note-card" style="display:none">
@@ -1151,8 +1229,8 @@
   </main>
 
 
-    <div id="rismaTransactionModal" class="modal hidden">
-      <div class="box" style="max-width:400px;width:100%">
+    <div id="rismaTransactionModal" class="modal hidden keyboard-safe-modal">
+      <div class="box keyboard-safe-box" style="max-width:400px;width:100%">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">
           <div>
             <h3 style="margin:0;font-size:16px;color:#be185d">Input Penjualan Risma</h3>
@@ -1202,6 +1280,12 @@ const FIREBASE_CONFIG={
 };
 const STAFF_DAILY_NOTE_DOC_ID='__staff_daily_home_note';
 const DEFAULT_STAFF_DAILY_NOTE='Semangat bekerja hari ini. Pastikan transaksi dicatat dengan benar dan refresh jika data belum masuk.';
+// Bridge ke aplikasi Belanjaku: Risma bisa lapor barang kosong (nama barang + warna) seperti staff.
+const BELANJAKU_BRIDGE_KEY='risma_to_belanjaku_barang_kosong_v1';
+const BELANJAKU_SUPABASE_URL='https://phuzgriglgovzcwgbehr.supabase.co';
+const BELANJAKU_SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBodXpncmlnbGdvdnpjd2diZWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1OTQ3ODUsImV4cCI6MjA5NDE3MDc4NX0.gf-cfo8Vos8uYgZRHG0KUB4xMhXAld2oTYv-wNiKneE';
+const BELANJAKU_SUPABASE_ITEMS_TABLE='belanja_items';
+
 function getSavedPage(){try{const p=localStorage.getItem(PAGE_KEY);return RESTORABLE_PAGES.includes(p)?p:'home'}catch(e){return 'home'}}
 let supabaseClient=null,transactions=[],zakatHistory=[],currentFilter='today',pendingAction=null,currentPage=getSavedPage();
 let txSaveBusy=false, opsSaveBusy=false, cashOutSaveBusy=false;
@@ -1364,6 +1448,51 @@ window.addEventListener('load',function(){
 });
 let firebaseDb=null,firebaseUnsub=null,todayFirebaseUnsub=null,firebaseUploadDate='',firebaseIncomeRows=[],firebaseIncomeTotal=0,todayFirebaseIncomeRows=[],todayFirebaseIncomeTotal=0,pendingFirebaseUploads=[],monthValidityBusy=false;
 function $(id){return document.getElementById(id)}
+  const KEYBOARD_SAFE_MODAL_IDS=['transactionModal','rismaTransactionModal','storeEmptyStockModal'];
+  function refreshKeyboardSafeModalViewport(){
+    const vv=window.visualViewport;
+    const keyboardOpen=!!(vv && vv.height < window.innerHeight - 120);
+    document.body.classList.toggle('keyboard-open', keyboardOpen);
+    KEYBOARD_SAFE_MODAL_IDS.forEach(id=>{
+      const modal=$(id);
+      if(!modal)return;
+      if(vv && !modal.classList.contains('hidden')){
+        modal.style.top=vv.offsetTop+'px';
+        modal.style.bottom='auto';
+        modal.style.height=vv.height+'px';
+      }else{
+        modal.style.top='';
+        modal.style.bottom='';
+        modal.style.height='';
+      }
+    });
+  }
+  function prepareKeyboardSafeModal(modal){
+    if(!modal)return;
+    setTimeout(refreshKeyboardSafeModalViewport,20);
+    setTimeout(refreshKeyboardSafeModalViewport,180);
+  }
+  function clearKeyboardSafeModal(modal){
+    if(modal){modal.style.top='';modal.style.bottom='';modal.style.height='';}
+    if(!KEYBOARD_SAFE_MODAL_IDS.some(id=>{const m=$(id);return m && !m.classList.contains('hidden')})){
+      document.body.classList.remove('keyboard-open');
+    }
+  }
+  function focusKeyboardSafeInput(el){
+    if(!el)return;
+    setTimeout(()=>{
+      refreshKeyboardSafeModalViewport();
+      try{el.scrollIntoView({block:'center',inline:'nearest',behavior:'smooth'});}catch(e){try{el.scrollIntoView(false);}catch(_){}}
+    },220);
+  }
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',refreshKeyboardSafeModalViewport);
+    window.visualViewport.addEventListener('scroll',refreshKeyboardSafeModalViewport);
+  }
+  document.addEventListener('focusin',function(e){
+    const modal=e.target&&e.target.closest&&e.target.closest('.keyboard-safe-modal');
+    if(modal)focusKeyboardSafeInput(e.target);
+  },true);
 function isSupabaseConfigured(){return SUPABASE_URL&&SUPABASE_ANON_KEY&&!SUPABASE_URL.includes('ISI_')&&!SUPABASE_ANON_KEY.includes('ISI_')}
 function initSupabase(){if(!isSupabaseConfigured()){showToast('Supabase belum disetting');return false}supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);return true}
 const HIDE_MODE_NAV_PAGES=['history','firebase'];
@@ -1409,8 +1538,82 @@ function goPage(p){
   if(p==='risma')initRismaPage();
   if(p==='staffDaily')initStaffDailySummaryPage();
 }
-function openTransactionModal(){$('inputDate').value=getLocalDateString();$('transactionModal').classList.remove('hidden');setTimeout(()=>$('amount').focus(),80)}
-function closeTransactionModal(){$('transactionModal').classList.add('hidden')}
+function openTransactionModal(){const modal=$('transactionModal');$('inputDate').value=getLocalDateString();modal.classList.remove('hidden');prepareKeyboardSafeModal(modal);setTimeout(()=>{const target=$('amount');target?.focus();focusKeyboardSafeInput(target);},80)}
+function closeTransactionModal(){const modal=$('transactionModal');modal.classList.add('hidden');clearKeyboardSafeModal(modal)}
+function cleanBelanjakuBridgeText(v){return String(v||'').replace(/[<>]/g,'').replace(/\s+/g,' ').trim()}
+function belanjakuBridgeSlug(v){return cleanBelanjakuBridgeText(v).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-.]/g,'').slice(0,70)||'item'}
+function getBelanjakuBridgeQueue(){try{const raw=JSON.parse(localStorage.getItem(BELANJAKU_BRIDGE_KEY)||'[]');return Array.isArray(raw)?raw.filter(Boolean):[]}catch(e){return []}}
+function setBelanjakuBridgeQueue(list){try{localStorage.setItem(BELANJAKU_BRIDGE_KEY,JSON.stringify((list||[]).slice(-250)))}catch(e){}}
+function saveBelanjakuBridgeQueue(item){const list=getBelanjakuBridgeQueue().filter(x=>String(x.id)!==String(item.id));list.push(item);setBelanjakuBridgeQueue(list)}
+function buildStoreBelanjakuEmptyItem({name,color,qty,supplier,note}){
+  const now=Date.now(), nowISO=new Date(now).toISOString();
+  const cleanName=cleanBelanjakuBridgeText(name), cleanColor=cleanBelanjakuBridgeText(color), cleanSupplier=cleanBelanjakuBridgeText(supplier), cleanNote=cleanBelanjakuBridgeText(note);
+  const id='risma_empty_'+belanjakuBridgeSlug(cleanName)+'_'+now+'_'+Math.random().toString(36).slice(2,7);
+  return {
+    id,
+    name:cleanName,
+    supplierName:cleanSupplier,
+    kodiPrice:0,
+    variants:[{colorName:cleanColor,qty:Math.max(1,Number(qty)||1),done:false}],
+    unit:'pcs',
+    priority:'Tinggi',
+    note:cleanNote?`Dari Risma: ${cleanNote}`:'Dari Risma - barang kosong',
+    done:false,
+    source:'stafku_barang_kosong',
+    staffStatus:'inbox',
+    staffRequest:true,
+    createdBy:'risma',
+    createdByName:'Risma',
+    createdAt:nowISO,
+    updatedAt:nowISO,
+    createdAtMs:now,
+    updatedAtMs:now
+  };
+}
+async function sendBelanjakuItemToSupabase(item){
+  if(typeof fetch!=='function')return false;
+  try{
+    const url=`${BELANJAKU_SUPABASE_URL.replace(/\/$/,'')}/rest/v1/${BELANJAKU_SUPABASE_ITEMS_TABLE}?on_conflict=id`;
+    const res=await fetch(url,{method:'POST',headers:{apikey:BELANJAKU_SUPABASE_ANON_KEY,Authorization:`Bearer ${BELANJAKU_SUPABASE_ANON_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:item.id,data:item,updated_at:item.updatedAt||new Date().toISOString()})});
+    if(!res.ok)throw new Error('Supabase '+res.status+': '+await res.text());
+    return true;
+  }catch(e){console.warn('Belanjaku bridge Risma belum terkirim',e);return false;}
+}
+async function syncBelanjakuBridgeQueue(){
+  const queue=getBelanjakuBridgeQueue();
+  if(!queue.length)return {sent:0,remaining:0};
+  const remaining=[];let sent=0;
+  for(const item of queue){
+    const ok=await sendBelanjakuItemToSupabase(item);
+    if(ok)sent+=1;else remaining.push(item);
+  }
+  setBelanjakuBridgeQueue(remaining);
+  return {sent,remaining:remaining.length};
+}
+function openStoreEmptyStockModal(){
+  const modal=$('storeEmptyStockModal');
+  if(!modal)return showToast('Form barang kosong belum siap');
+  ['storeEmptyStockName','storeEmptyStockColor','storeEmptyStockSupplier','storeEmptyStockNote'].forEach(id=>{const el=$(id);if(el)el.value=''});
+  if($('storeEmptyStockQty'))$('storeEmptyStockQty').value='1';
+  modal.classList.remove('hidden');
+  prepareKeyboardSafeModal(modal);
+  setTimeout(()=>{const target=$('storeEmptyStockName');target?.focus();focusKeyboardSafeInput(target);},80);
+}
+function closeStoreEmptyStockModal(){const modal=$('storeEmptyStockModal');if(modal){modal.classList.add('hidden');clearKeyboardSafeModal(modal)}}
+async function submitStoreEmptyStock(){
+  const name=cleanBelanjakuBridgeText($('storeEmptyStockName')?.value), color=cleanBelanjakuBridgeText($('storeEmptyStockColor')?.value);
+  if(!name)return showToast('Nama barang wajib diisi');
+  if(!color)return showToast('Warna wajib diisi');
+  const qty=Math.max(1,Number(String($('storeEmptyStockQty')?.value||'').replace(/\D/g,''))||1);
+  const item=buildStoreBelanjakuEmptyItem({name,color,qty,supplier:$('storeEmptyStockSupplier')?.value,note:$('storeEmptyStockNote')?.value});
+  saveBelanjakuBridgeQueue(item);
+  closeStoreEmptyStockModal();
+  showToast('Barang kosong dari Risma disiapkan untuk Belanjaku');
+  const result=await syncBelanjakuBridgeQueue();
+  if(result.sent>0)showToast('Barang kosong Risma masuk ke halaman Kiriman Staff Belanjaku');
+  else showToast('Tersimpan lokal, buka Belanjaku lalu refresh');
+}
+
 const ZAKAT_LOCAL_BACKUP_KEY='risma_zakat_history_backup_v2';
 function roundRp(n){const x=Number(n||0);return Number.isFinite(x)?Math.round(x):0}
 function normalizeZakatRecord(r={}){
@@ -2977,12 +3180,13 @@ function openRismaTransactionModal(){
   const preview=$('rismaAmountPreview');
   if(preview)preview.innerText='';
   modal.classList.remove('hidden');
+  prepareKeyboardSafeModal(modal);
   // Saat FAB transaksi Risma dibuka, keyboard masuk ke Nama Barang dulu, bukan Nominal.
-  setTimeout(()=>desc?.focus(),80);
+  setTimeout(()=>{desc?.focus();focusKeyboardSafeInput(desc);},80);
 }
 function closeRismaTransactionModal(){
   const modal=$('rismaTransactionModal');
-  if(modal)modal.classList.add('hidden');
+  if(modal){modal.classList.add('hidden');clearKeyboardSafeModal(modal);}
 }
 
 function handleRismaAmountPreview(input){
@@ -4318,6 +4522,7 @@ async function refreshAllData(){
       supabaseJobs.push(loadZakatHistory());
     }
     await Promise.allSettled(supabaseJobs);
+    syncBelanjakuBridgeQueue().catch(e=>console.warn('Sync Belanjaku toko gagal:',e));
 
     if(!firebaseDb)initFirebase();
     if(firebaseDb){
@@ -4358,6 +4563,10 @@ async function refreshAllData(){
     refreshAllDataBusy=false;
   }
 }
+
+
+window.addEventListener('online',()=>{syncBelanjakuBridgeQueue().then(r=>{if(r.sent)showToast('Barang kosong terkirim ke Belanjaku')}).catch(()=>{})});
+window.addEventListener('focus',()=>{syncBelanjakuBridgeQueue().catch(()=>{})});
 
 async function initApp(){try{if(!initSupabase())return;
   // Tampilkan loading saat fetch Supabase
