@@ -234,6 +234,18 @@
     }
     .risma-fab:active{transform:scale(.96)}
     .risma-tx-modal-card{background:#fff0f6;border:1px solid #f9a8d4;border-radius:18px;padding:14px;margin-bottom:10px}
+    .risma-payment-summary{background:#fff0f6;border:1px solid #f9a8d4;border-radius:16px;padding:12px;margin:10px 0 12px}
+    .risma-payment-summary .rp-label{font-size:10px;font-weight:950;color:#be185d;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+    .risma-payment-summary .rp-amount{font-size:24px;font-weight:950;color:#be185d;line-height:1.12;margin:3px 0}
+    .risma-payment-summary .rp-desc{font-size:11px;font-weight:850;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .risma-payment-options{display:grid;grid-template-columns:1fr;gap:9px}
+    .risma-payment-option{width:100%;border-radius:15px;padding:13px 12px;min-height:52px;font-weight:950;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid transparent}
+    .risma-payment-option b{display:block;font-size:14px;line-height:1.15}
+    .risma-payment-option small{display:block;font-size:10.5px;font-weight:800;opacity:.76;margin-top:2px;line-height:1.25}
+    .risma-payment-option.cash{background:#ecfdf5;color:#047857;border-color:#bbf7d0}
+    .risma-payment-option.qris{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+    .risma-payment-option:active{transform:scale(.97)}
+    .risma-payment-option:disabled{opacity:.65;cursor:not-allowed;transform:none}
     @media(max-width:440px){.risma-fab{right:16px!important}}
     @media(max-width:360px){.risma-fab{right:14px!important;bottom:92px!important}}
 
@@ -1286,8 +1298,34 @@
         </div>
         <div class="row" style="margin-top:10px">
           <button class="btn secondary" onclick="closeRismaTransactionModal()">Batal</button>
-          <button class="btn" id="rismaSaveBtn" style="background:linear-gradient(135deg,#be185d,#9d174d);font-size:15px" onclick="addRismaTransaction()">💾 Simpan</button>
+          <button class="btn" id="rismaSaveBtn" style="background:linear-gradient(135deg,#be185d,#9d174d);font-size:15px" onclick="openRismaPaymentModal()">💾 Simpan</button>
         </div>
+      </div>
+    </div>
+
+    <div id="rismaPaymentModal" class="modal hidden" style="z-index:180">
+      <div class="box" style="max-width:390px;width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+          <div>
+            <h3 style="margin:0;font-size:17px;color:#be185d">Pilih Metode Pembayaran</h3>
+            <small style="color:var(--muted);font-size:11px;font-weight:800">Transaksi dianggap sukses setelah pilih salah satu.</small>
+          </div>
+          <button class="x" style="font-size:22px;padding:4px 6px" onclick="closeRismaPaymentModal()">×</button>
+        </div>
+        <div class="risma-payment-summary">
+          <div class="rp-label">Total Penjualan Risma</div>
+          <div id="rismaPaymentAmount" class="rp-amount num">Rp 0</div>
+          <div id="rismaPaymentDesc" class="rp-desc">Penjualan</div>
+        </div>
+        <div class="risma-payment-options">
+          <button id="rismaPayCashBtn" class="risma-payment-option cash" onpointerdown="event.preventDefault();submitRismaPaymentChoice('cash')" onclick="submitRismaPaymentChoice('cash')">
+            <span><b>💵 Cash</b><small>Masuk sebagai cash fisik.</small></span><span>›</span>
+          </button>
+          <button id="rismaPayQrisBtn" class="risma-payment-option qris" onpointerdown="event.preventDefault();submitRismaPaymentChoice('qris_transfer')" onclick="submitRismaPaymentChoice('qris_transfer')">
+            <span><b>📱 QRIS / Transfer</b><small>Otomatis masuk Pengurangan Cash tab QRIS.</small></span><span>›</span>
+          </button>
+        </div>
+        <button class="btn secondary" style="margin-top:10px" onclick="closeRismaPaymentModal()">Batal</button>
       </div>
     </div>
 
@@ -1843,7 +1881,7 @@ async function deleteTransactionFromDB(id){
 }
 async function clearManualTransactions(){
   // Proteksi: data hasil upload Firebase tetap LOCK dan tidak ikut dihapus massal.
-  const manualRows=transactions.filter(t=>!isFirebaseUploaded(t));
+  const manualRows=transactions.filter(t=>!isFirebaseUploaded(t)&&!isAutoQrisCashOut(t));
   for(const t of manualRows){
     const{error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',t.id);
     if(error)throw error;
@@ -1999,12 +2037,111 @@ async function fetchFirebaseRowsByRange(start,end){
   return normalizeFirebaseRows(Object.values(merged)).filter(t=>t.dateKey>=start&&t.dateKey<=end);
 }
 function sumFirebaseRows(rows){return dedupeFirebaseRows(rows||[]).reduce((a,b)=>a+Number(b.amount||0),0)}
+
+// === AUTO CASH OUT QRIS DARI FIREBASE KASIR ===
+// Transaksi kasir yang metode pembayarannya QRIS / Transfer tetap dihitung sebagai omset,
+// lalu otomatis dibuat sebagai Cash Out QRIS supaya Cash Fisik berkurang tanpa input manual.
+function getFirebaseDocKeyForAutoCashOut(t={}){
+  return String(t._docId||t.clientId||t.id||t.docId||t.doc_id||[
+    t.dateKey||getFirebaseRecordDateKey(t),
+    t.user||t.username||t.name||'',
+    t.note||t.description||'',
+    t.amount||0,
+    t.createdAtMs||t.timestamp||''
+  ].join('|')).trim();
+}
+function isFirebaseQrisPayment(t={}){
+  const raw=String(t.paymentMethod||t.payment_method||t.paymentLabel||t.payment_label||t.paymentType||t.payment_type||t.metodePembayaran||t.metode_pembayaran||'').toLowerCase();
+  if(!raw)return false;
+  if(/cash|tunai/.test(raw))return false;
+  return /qris|qr\s*is|transfer|bank/.test(raw);
+}
+function autoQrisHash(s){
+  let h=2166136261;
+  s=String(s||'');
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+  return Math.abs(h>>>0)%1000000;
+}
+function getAutoQrisCashOutId(t={}){
+  const dateDigits=String(t.dateKey||getFirebaseRecordDateKey(t)||getLocalDateString()).replace(/\D/g,'').slice(0,8)||'19700101';
+  const hash=String(autoQrisHash(getFirebaseDocKeyForAutoCashOut(t))).padStart(6,'0');
+  return Number(dateDigits+'88'+hash);
+}
+function getAutoQrisCashOutMarker(t={}){
+  return `[AUTO-QRIS:${String(autoQrisHash(getFirebaseDocKeyForAutoCashOut(t))).padStart(6,'0')}]`;
+}
+function buildAutoQrisCashOutDesc(t={}){
+  const note=String(t.note||t.description||t.keterangan||'Transaksi QRIS').trim()||'Transaksi QRIS';
+  const staff=String(t.name||t.user||t.username||t.kasir||t.createdBy||'').trim();
+  const staffText=staff?` · ${staff}`:'';
+  return `${CASHOUT_PREFIX}qris] ${getAutoQrisCashOutMarker(t)} QRIS otomatis kasir - ${note}${staffText}`;
+}
+function isAutoQrisCashOut(t={}){
+  const desc=String(t.description||'');
+  return isCashOut(t)&&getCashOutType(t)==='qris'&&(desc.includes('[AUTO-QRIS:')||/QRIS\s+otomatis\s+kasir/i.test(desc));
+}
+function getAutoQrisSyncDates(rows=[],opts={}){
+  const dates=new Set();
+  const add=d=>{d=String(d||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(d))dates.add(d)};
+  add(opts.date||opts.dateKey||opts.firebaseUploadDate);
+  if(Array.isArray(opts.dates))opts.dates.forEach(add);
+  (rows||[]).forEach(t=>add(t&&((t.dateKey)||getFirebaseRecordDateKey(t))));
+  return Array.from(dates);
+}
+async function deleteStaleAutoQrisCashOut(validIds,dates,opts={}){
+  if(!supabaseClient||!dates||!dates.length)return false;
+  const dateSet=new Set(dates.map(String));
+  const stale=(transactions||[]).filter(t=>isAutoQrisCashOut(t)&&dateSet.has(String(t.date||''))&&!validIds.has(Number(t.id)));
+  if(!stale.length)return false;
+  for(const t of stale){
+    const {error}=await supabaseClient.from('transactions').delete().eq('owner_id',OWNER_ID).eq('id',Number(t.id));
+    if(error)throw error;
+  }
+  if(!opts.quiet)showToast(`${stale.length} QRIS otomatis dihapus karena transaksi staff sudah dihapus`);
+  return true;
+}
+async function syncFirebaseQrisCashOut(rows,opts={}){
+  if(!supabaseClient||!Array.isArray(rows))return false;
+  const candidates=[];
+  const seen=new Set();
+  (rows||[]).forEach(t=>{
+    if(!t||isFirebaseRecordDeleted(t)||!isFirebaseQrisPayment(t))return;
+    const amount=Number(t.amount||0);
+    const date=t.dateKey||getFirebaseRecordDateKey(t);
+    if(!date||!amount||amount<=0)return;
+    const id=getAutoQrisCashOutId(t);
+    if(seen.has(id))return;
+    seen.add(id);
+    candidates.push({id,owner_id:OWNER_ID,date,description:buildAutoQrisCashOutDesc(t),amount,type:'expense'});
+  });
+  const validIds=new Set(candidates.map(r=>Number(r.id)));
+  const syncDates=getAutoQrisSyncDates(rows,opts);
+  const existing=new Map((transactions||[]).map(t=>[Number(t.id),t]));
+  const rowsToUpsert=candidates.filter(r=>{
+    const old=existing.get(Number(r.id));
+    return !(old&&String(old.date||'')===String(r.date)&&String(old.description||'')===String(r.description)&&Number(old.amount||0)===Number(r.amount)&&String(old.type||'')===String(r.type));
+  });
+  try{
+    const staleChanged=await deleteStaleAutoQrisCashOut(validIds,syncDates,opts);
+    if(rowsToUpsert.length){
+      const {error}=await supabaseClient.from('transactions').upsert(rowsToUpsert,{onConflict:'id'});
+      if(error)throw error;
+      if(!opts.quiet)showToast(`${rowsToUpsert.length} QRIS otomatis masuk Pengurangan Cash`);
+    }
+    return staleChanged||rowsToUpsert.length>0;
+  }catch(e){
+    console.warn('Auto Cash Out QRIS gagal:',e);
+    if(!opts.quiet)showToast('Auto QRIS gagal: '+(e.message||e));
+    return false;
+  }
+}
+
 $('inputDate').value=getLocalDateString();$('filterStartDate').value=getLocalDateString();$('filterEndDate').value=getLocalDateString();if($('filterStartDateHistory'))$('filterStartDateHistory').value=getLocalDateString();if($('filterEndDateHistory'))$('filterEndDateHistory').value=getLocalDateString();firebaseUploadDate=getLocalDateString();setTimeout(()=>{if($('firebaseUploadDate'))$('firebaseUploadDate').value=firebaseUploadDate;setPendingThisMonth(false);updateMonthValidityIdle()},0);
 function openPasswordModal(cb){pendingAction=cb;$('passwordModal').classList.remove('hidden');$('confirmPasswordInput').value='';setTimeout(()=>$('confirmPasswordInput').focus(),80)}function closePasswordModal(){$('passwordModal').classList.add('hidden');pendingAction=null}$('confirmPasswordInput').addEventListener('input',()=>{$('confirmPasswordInput').value=$('confirmPasswordInput').value.replace(/\D/g,'')});$('confirmPasswordInput').addEventListener('keydown',(e)=>{if(e.key==='Enter')$('btnConfirmAction').click()});$('btnConfirmAction').addEventListener('click',()=>{if($('confirmPasswordInput').value===APP_PIN){const a=pendingAction;closePasswordModal();if(a)a()}else{showToast('PIN salah');$('confirmPasswordInput').value='';setTimeout(()=>$('confirmPasswordInput').focus(),80)}});
 async function addTransaction(){if(txSaveBusy)return;txSaveBusy=true;try{const dateVal=$('inputDate').value,type=$('type').value;let desc=$('description').value.trim();const amount=getActualAmount($('amount').value);if(type==='income'&&!desc)desc='Omset';if(type==='expense'&&!desc){showToast('Deskripsi pengeluaran wajib');return}if(!dateVal||amount<=0){showToast('Nominal tidak valid');return}await saveTransaction({id:Date.now(),date:dateVal,description:desc,amount,type});await loadTransactions();render();$('description').value='';$('amount').value='';$('liveAmountPreview').innerText='';$('inputDate').value=getLocalDateString();closeTransactionModal();showToast('Transaksi tersimpan');goPage('home')}catch(e){showToast('Gagal simpan: '+e.message)}finally{txSaveBusy=false}}
 function onHistoryRangeChange(){$('filterStartDate').value=$('filterStartDateHistory').value;$('filterEndDate').value=$('filterEndDateHistory').value;render();}
 function changeFilter(f){currentFilter=f;$('rangeSelector').classList.toggle('hidden',f!=='range');const rh=$('rangeSelectorHistory');if(rh)rh.classList.toggle('hidden',f!=='range');if(f==='range'){const s=$('filterStartDateHistory'),e=$('filterEndDateHistory');if(s&&!s.value)s.value=getLocalDateString();if(e&&!e.value)e.value=getLocalDateString();$('filterStartDate').value=s?s.value:getLocalDateString();$('filterEndDate').value=e?e.value:getLocalDateString();}updateFilterUI();render();updateMonthValidityIdle()}function updateFilterUI(){['today','month','range','all'].forEach(f=>{const el=$('filter-'+f);if(el)el.classList.toggle('active',f===currentFilter)})}
-async function deleteTransaction(id){const t=transactions.find(x=>Number(x.id)===Number(id));if(t&&isFirebaseUploaded(t)){showToast('Data Firebase LOCK. Gunakan tombol Sync di halaman Firebase, bukan hapus manual.');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
+async function deleteTransaction(id){const t=transactions.find(x=>Number(x.id)===Number(id));if(t&&isAutoQrisCashOut(t)){showToast('QRIS otomatis tidak bisa dihapus di sini. Hapus transaksi aslinya dari aplikasi staff.');return}if(t&&isFirebaseUploaded(t)){showToast('Data Firebase LOCK. Gunakan tombol Sync di halaman Firebase, bukan hapus manual.');return}openPasswordModal(async()=>{try{await deleteTransactionFromDB(id);await loadTransactions();validateAndCancelInvalidZakat();render();showToast('Transaksi dihapus')}catch(e){showToast('Gagal hapus: '+e.message)}})}
 async function requestClearAll(){openPasswordModal(async()=>{if(confirm('Hapus semua data manual? Data FIREBASE LOCK tidak akan dihapus.')){try{await clearManualTransactions();await saveZakatHistory([]);await loadTransactions();render();showToast('Data manual dihapus. FIREBASE LOCK tetap aman.')}catch(e){showToast('Gagal reset: '+e.message)}}})}
 function formatRupiah(n){return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0,maximumFractionDigits:0}).format(roundRp(n))}function getActualAmount(raw){if(!raw||isNaN(raw))return 0;return parseFloat(raw)*1000}function handleSmartAmount(input){$('liveAmountPreview').innerText=input.value?formatRupiah(getActualAmount(input.value)):''}function updatePlaceholder(){$('description').placeholder=$('type').value==='expense'?'Contoh: Makan, listrik':'Omset (boleh kosong)'}
 function getGrossIncomeForRange(mode,startDate,endDate){
@@ -2161,9 +2298,11 @@ function startTodayFirebaseWatch(){
   // Kembalikan Promise yang resolve setelah snapshot PERTAMA diterima
   return new Promise((resolve)=>{
     let resolved=false;
-    todayFirebaseUnsub=q.onSnapshot(snap=>{
+    todayFirebaseUnsub=q.onSnapshot(async snap=>{
       todayFirebaseIncomeRows=normalizeFirebaseRows(snap.docs.map(d=>({...d.data(),_docId:d.id,id:d.id}))).filter(t=>t.dateKey===today);
       todayFirebaseIncomeTotal=sumFirebaseRows(todayFirebaseIncomeRows);
+      const qrisChangedToday=await syncFirebaseQrisCashOut(todayFirebaseIncomeRows,{quiet:true,date:today});
+      if(qrisChangedToday)await loadTransactions();
       if(!resolved){resolved=true;resolve();} // resolve di snapshot pertama
       else{
         // Update berikutnya (realtime) — render semua
@@ -2188,10 +2327,13 @@ function startFirebaseWatch(date){
   if($('firebaseUploadDate'))$('firebaseUploadDate').value=firebaseUploadDate;
   if(firebaseUnsub){firebaseUnsub();firebaseUnsub=null}
   const q=firebaseDb.collection('transactions').where('dateKey','==',firebaseUploadDate);
-  firebaseUnsub=q.onSnapshot(snap=>{
+  firebaseUnsub=q.onSnapshot(async snap=>{
     firebaseIncomeRows=normalizeFirebaseRows(snap.docs.map(d=>({...d.data(),_docId:d.id,id:d.id}))).filter(t=>t.dateKey===firebaseUploadDate);
     firebaseIncomeTotal=sumFirebaseRows(firebaseIncomeRows);
+    const qrisChangedSelected=await syncFirebaseQrisCashOut(firebaseIncomeRows,{quiet:true,date:firebaseUploadDate});
+    if(qrisChangedSelected)await loadTransactions();
     renderFirebaseUploadCard();
+    renderCashFisik();
   },err=>{console.error(err);showToast('Gagal baca Firebase: '+err.message)})
 }
 
@@ -2635,7 +2777,7 @@ function getCashOutType(t){
   const m=String(t.description||'').match(/^\[CASHOUT:(\w+)\]/);
   return m?m[1]:'lainnya';
 }
-function cleanCashOutDesc(desc){return String(desc||'').replace(/^\[CASHOUT:\w+\]\s*/,'')}
+function cleanCashOutDesc(desc){return String(desc||'').replace(/^\[CASHOUT:\w+\]\s*/,'').replace(/^\[AUTO-QRIS:[^\]]+\]\s*/,'')}
 
 function setCashOutType(type){
   currentCashOutType=type;
@@ -2667,12 +2809,22 @@ function renderCashOutTodayList(){
   list.innerHTML=rows.map(t=>{
     const tp=getCashOutType(t);
     const desc=cleanCashOutDesc(t.description)||typeLabel[tp]||tp;
-    return `<div class="cashout-list-item"><div style="min-width:0;flex:1;display:flex;align-items:center;gap:7px"><span class="cashout-badge ${tp}">${typeLabel[tp]||tp}</span><div style="min-width:0"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(desc)}</b><span style="font-size:10px;color:var(--muted)">${t.date}</span></div></div><b class="num" style="font-size:14px;color:#2563eb;white-space:nowrap">-${formatRupiah(t.amount).replace('Rp','')}</b><button class="x" style="color:var(--red);font-size:18px;padding:4px 8px" onclick="deleteCashOutWithPin(${t.id})">×</button></div>`;
+    const locked=isAutoQrisCashOut(t);
+    const action=locked
+      ? `<span class="cashout-badge qris" style="background:#eef2ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:9px;white-space:nowrap">🔒 Staff</span>`
+      : `<button class="x" style="color:var(--red);font-size:18px;padding:4px 8px" onclick="deleteCashOutWithPin(${t.id})">×</button>`;
+    const sub=locked?'QRIS otomatis · hapus dari aplikasi staff':t.date;
+    return `<div class="cashout-list-item"><div style="min-width:0;flex:1;display:flex;align-items:center;gap:7px"><span class="cashout-badge ${tp}">${typeLabel[tp]||tp}</span><div style="min-width:0"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(desc)}</b><span style="font-size:10px;color:var(--muted)">${escapeHtml(sub)}</span></div></div><b class="num" style="font-size:14px;color:#2563eb;white-space:nowrap">-${formatRupiah(t.amount).replace('Rp','')}</b>${action}</div>`;
   }).join('');
 }
 
 
 function deleteCashOutWithPin(id){
+  const t=(transactions||[]).find(x=>Number(x.id)===Number(id));
+  if(t&&isAutoQrisCashOut(t)){
+    showToast('QRIS otomatis tidak bisa dihapus di sini. Hapus transaksi aslinya dari aplikasi staff.');
+    return;
+  }
   closeCashOutModal();
   setTimeout(()=>{
     openPasswordModal(async()=>{
@@ -3041,6 +3193,9 @@ let rismaManualBonusUnsub=null;
 let rismaManualClosingBusy=false;
 let rismaUserUnsub=null;
 let rismaTodayRows=[];
+let rismaPaymentPending=null;
+let rismaPaymentSubmitting=false;
+let rismaPaymentLastSubmitAt=0;
 let rismaMonthRows=[];
 let rismaClosingRows=[];
 let rismaManualBonusRows=[];
@@ -3306,6 +3461,7 @@ function openRismaTransactionModal(){
   if(!modal)return;
   const amount=$('rismaAmount');
   const desc=$('rismaDesc');
+  closeRismaPaymentModal(true);
   if(desc)desc.value='';
   if(amount)amount.value='';
   const preview=$('rismaAmountPreview');
@@ -3316,8 +3472,71 @@ function openRismaTransactionModal(){
   setTimeout(()=>{desc?.focus();focusKeyboardSafeInput(desc);},80);
 }
 function closeRismaTransactionModal(){
+  closeRismaPaymentModal(true);
   const modal=$('rismaTransactionModal');
   if(modal){modal.classList.add('hidden');clearKeyboardSafeModal(modal);}
+}
+
+function getRismaPaymentInfo(method){
+  const value=String(method||'cash').toLowerCase();
+  if(value==='qris'||value==='transfer'||value==='qris_transfer'||value==='qris/transfer'){
+    return {method:'qris_transfer',label:'QRIS / Transfer',shortLabel:'QRIS'};
+  }
+  return {method:'cash',label:'Cash',shortLabel:'Cash'};
+}
+function getRismaPaymentLabelFromRecord(t={}){
+  const raw=String(t.paymentMethod||t.payment_method||t.paymentLabel||t.payment_label||t.paymentType||t.payment_type||t.metodePembayaran||t.metode_pembayaran||'').toLowerCase();
+  if(!raw)return '';
+  if(/cash|tunai/.test(raw))return 'Cash';
+  if(/qris|qr\s*is|transfer|bank/.test(raw))return 'QRIS / Transfer';
+  return String(t.paymentLabel||t.payment_label||t.metodePembayaran||t.metode_pembayaran||'').trim();
+}
+function resetRismaPaymentButtons(){
+  const cash=$('rismaPayCashBtn'),qris=$('rismaPayQrisBtn');
+  if(cash){cash.disabled=false;cash.innerHTML='<span><b>💵 Cash</b><small>Masuk sebagai cash fisik.</small></span><span>›</span>';}
+  if(qris){qris.disabled=false;qris.innerHTML='<span><b>📱 QRIS / Transfer</b><small>Otomatis masuk Pengurangan Cash tab QRIS.</small></span><span>›</span>';}
+}
+function setRismaPaymentBusy(method){
+  const cash=$('rismaPayCashBtn'),qris=$('rismaPayQrisBtn');
+  const picked=getRismaPaymentInfo(method).method;
+  if(cash){cash.disabled=true;if(picked==='cash')cash.innerHTML='<span><b>⏳ Menyimpan Cash...</b><small>Mohon tunggu.</small></span>';}
+  if(qris){qris.disabled=true;if(picked==='qris_transfer')qris.innerHTML='<span><b>⏳ Menyimpan QRIS...</b><small>Mohon tunggu.</small></span>';}
+}
+async function openRismaPaymentModal(){
+  if(!firebaseDb){showToast('Firebase tidak aktif');return;}
+  if(rismaPaymentSubmitting)return;
+  const amount=getActualAmount($('rismaAmount')?.value||'');
+  if(!amount||amount<=0){showToast('Nominal tidak valid');return;}
+  const canSave=await validateRismaCanTransact();
+  if(!canSave)return;
+  const descInput=String($('rismaDesc')?.value||'').trim();
+  const desc=descInput||'Penjualan';
+  rismaPaymentPending={amount,desc};
+  if($('rismaPaymentAmount'))$('rismaPaymentAmount').innerText=formatRupiah(amount);
+  if($('rismaPaymentDesc'))$('rismaPaymentDesc').innerText=desc;
+  resetRismaPaymentButtons();
+  const modal=$('rismaPaymentModal');
+  if(modal)modal.classList.remove('hidden');
+}
+function closeRismaPaymentModal(silent=false){
+  const modal=$('rismaPaymentModal');
+  if(modal)modal.classList.add('hidden');
+  rismaPaymentPending=null;
+  rismaPaymentSubmitting=false;
+  resetRismaPaymentButtons();
+}
+async function submitRismaPaymentChoice(method){
+  const now=Date.now();
+  if(rismaPaymentSubmitting||now-rismaPaymentLastSubmitAt<800)return;
+  rismaPaymentLastSubmitAt=now;
+  rismaPaymentSubmitting=true;
+  setRismaPaymentBusy(method);
+  try{
+    await addRismaTransaction(method);
+  }finally{
+    rismaPaymentSubmitting=false;
+    resetRismaPaymentButtons();
+  }
 }
 
 function handleRismaAmountPreview(input){
@@ -4321,12 +4540,14 @@ function renderRismaToday(){
     const desc=t.description||t.desc||t.keterangan||t.note||'Penjualan';
     const ms=getRismaRecordTime(t);
     const waktu=ms?new Date(ms).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'--:--';
+    const payLabel=getRismaPaymentLabelFromRecord(t);
+    const payText=payLabel?` · ${payLabel}`:'';
     return `<div class="item">
       <div class="left">
         <div class="icon in" style="background:#fce7f3;color:#be185d">💰</div>
         <div class="desc">
           <b>${escapeHtml(desc)}</b>
-          <small>${waktu}</small>
+          <small>${waktu}${payText}</small>
         </div>
       </div>
       <div class="right">
@@ -4412,7 +4633,8 @@ async function validateRismaCanTransact(){
   return true;
 }
 
-async function addRismaTransaction(){
+async function addRismaTransaction(paymentMethod){
+  if(!paymentMethod){await openRismaPaymentModal();return;}
   if(!firebaseDb){showToast('Firebase tidak aktif');return;}
   const canSave=await validateRismaCanTransact();
   if(!canSave)return;
@@ -4421,6 +4643,7 @@ async function addRismaTransaction(){
   if(!amount||amount<=0){showToast('Nominal tidak valid');return;}
   const descInput=$('rismaDesc').value.trim();
   const desc=descInput||'Penjualan';
+  const pay=getRismaPaymentInfo(paymentMethod);
   const today=getLocalDateString();
   const now=Date.now();
 
@@ -4433,7 +4656,7 @@ async function addRismaTransaction(){
     const freshUser=latest.user||rismaUserProfile;
     const bonusSnapshot=latest.snapshot||getRismaBonusSnapshot(freshUser);
     const displayName=String(freshUser?.name||getRismaDisplayName()||RISMA_NAME).trim()||RISMA_NAME;
-    await firebaseDb.collection('transactions').add({
+    const payload={
       user:RISMA_USERNAME,
       username:RISMA_USERNAME,
       name:displayName,
@@ -4453,20 +4676,35 @@ async function addRismaTransaction(){
       note:desc,
       kasir:RISMA_USERNAME,
       kasirName:displayName,
+      paymentMethod:pay.method,
+      paymentLabel:pay.label,
+      paymentStatus:'success',
+      paymentType:pay.method,
+      metodePembayaran:pay.label,
+      metode_pembayaran:pay.label,
       createdAt:getCompatServerTimestamp(),
       createdAtMs:now,
       timestamp:now,
       deleted:false,
       type:'income',
       source:'risma_direct'
-    });
+    };
+    const docRef=await firebaseDb.collection('transactions').add(payload);
+    if(isFirebaseQrisPayment(payload)){
+      const changed=await syncFirebaseQrisCashOut([{...payload,_docId:docRef.id,id:docRef.id}],{quiet:true,date:today});
+      if(changed)await loadTransactions();
+      render();
+      renderCashFisik();
+      renderCashOutTodayList();
+    }
     $('rismaAmount').value='';
     $('rismaDesc').value='';
     $('rismaAmountPreview').innerText='';
+    closeRismaPaymentModal(true);
     closeRismaTransactionModal();
     playRismaSuccessSound();
     if(firstTxToday)showRismaFirstTxParty(amount,desc);
-    showToast('✅ Penjualan Risma tersimpan!');
+    showToast(`✅ Penjualan Risma tersimpan (${pay.label})!`);
   }catch(e){
     showToast('Gagal simpan: '+e.message);
     console.error(e);
@@ -4510,6 +4748,10 @@ async function deleteRismaTransaction(docId){
       deletedBy:RISMA_USERNAME,
       deletedByName:getRismaDisplayName()
     });
+    await refreshCoreFirebaseDataOnce();
+    render();
+    renderCashFisik();
+    renderCashOutTodayList();
     showToast('Transaksi Risma dihapus');
   }catch(e){
     showToast('Gagal hapus: '+e.message);
@@ -4558,6 +4800,8 @@ async function refreshCoreFirebaseDataOnce(){
     firebaseIncomeTotal=sumFirebaseRows(firebaseIncomeRows);
   }));
   await Promise.allSettled(jobs);
+  const qrisChangedCore=await syncFirebaseQrisCashOut([...(todayFirebaseIncomeRows||[]),...(firebaseIncomeRows||[])],{quiet:true});
+  if(qrisChangedCore)await loadTransactions();
 }
 async function refreshRismaFirebaseDataOnce(){
   if(!firebaseDb)return;
