@@ -751,6 +751,43 @@
     }
 
 
+    /* === BARANG KOSONG MULTI WARNA RISMA === */
+    .store-empty-variant-head{
+      display:flex;align-items:center;justify-content:space-between;gap:8px;
+      margin:0 0 7px;
+    }
+    .store-empty-variant-head b{
+      font-size:11px;color:#7c5f13;text-transform:uppercase;letter-spacing:.45px;
+    }
+    .store-empty-variant-list{display:flex;flex-direction:column;gap:7px;margin-bottom:8px}
+    .store-empty-variant-row{
+      display:grid;grid-template-columns:minmax(0,1fr) 76px 36px;
+      gap:7px;align-items:start;
+    }
+    .store-empty-variant-row input{
+      min-height:41px!important;border-radius:12px!important;background:white!important;padding:9px 10px!important;
+    }
+    .store-empty-variant-row .store-empty-qty{text-align:center;font-weight:900;padding-left:7px!important;padding-right:7px!important}
+    .store-empty-remove-color{
+      width:36px;min-height:41px;border-radius:12px;background:#fff0ee;color:var(--red);
+      border:1px solid #ffd7d0;font-size:18px;font-weight:950;line-height:1;padding:0;
+    }
+    .store-empty-remove-color:active{transform:scale(.94);opacity:.85}
+    .store-empty-variant-row.only-one .store-empty-remove-color{visibility:hidden;pointer-events:none}
+    .store-empty-add-color{
+      width:100%;min-height:38px;border-radius:13px;background:white;color:#7c5f13;
+      border:1.5px dashed #d7b45a;font-size:12px;font-weight:950;margin:0 0 9px;
+    }
+    .store-empty-add-color:active{transform:scale(.98);background:#fffdf4}
+    .store-empty-multi-note{
+      font-size:10.5px;color:#7c5f13;font-weight:850;line-height:1.35;margin:-2px 0 9px;
+    }
+    @media(max-width:360px){
+      .store-empty-variant-row{grid-template-columns:minmax(0,1fr) 64px 34px;gap:5px}
+      .store-empty-remove-color{width:34px}
+    }
+
+
 
     /* === KEYBOARD SAFE MODALS: TRANSAKSI + BARANG KOSONG === */
     #transactionModal.keyboard-safe-modal,
@@ -991,14 +1028,17 @@
       </div>
       <div style="background:#fff8e5;border:1px solid #f2df9b;border-radius:16px;padding:12px;margin-bottom:10px">
         <div class="field"><input type="text" id="storeEmptyStockName" autocomplete="off" placeholder="Nama barang, contoh: Pasmina Ceruty"></div>
-        <div class="field"><input type="text" id="storeEmptyStockColor" autocomplete="off" placeholder="Warna / motif, contoh: Milo"></div>
-        <div class="row">
-          <div class="field"><input type="tel" inputmode="numeric" pattern="[0-9]*" id="storeEmptyStockQty" value="1" placeholder="Qty"></div>
-          <div class="field"><input type="text" id="storeEmptyStockSupplier" autocomplete="off" placeholder="Supplier (opsional)"></div>
+        <div class="store-empty-variant-head">
+          <b>Warna / Motif</b>
+          <span class="chip" style="background:white;color:#7c5f13;border-color:#f2df9b">1 barang bisa banyak warna</span>
         </div>
+        <div id="storeEmptyStockVariantList" class="store-empty-variant-list"></div>
+        <button type="button" class="store-empty-add-color" onclick="addStoreEmptyStockVariantRow()">+ Tambah Warna</button>
+        <div class="store-empty-multi-note">Contoh: Milo 2 pcs, Navy 1 pcs, Hitam 3 pcs — tetap terkirim sebagai <b>1 barang multi warna</b>.</div>
+        <div class="field"><input type="text" id="storeEmptyStockSupplier" autocomplete="off" placeholder="Supplier (opsional)"></div>
         <div class="field" style="margin-bottom:0"><input type="text" id="storeEmptyStockNote" autocomplete="off" placeholder="Catatan (opsional)"></div>
       </div>
-      <div class="small" style="font-weight:800;line-height:1.45;margin-bottom:10px;color:#7c5f13">Barang tidak langsung masuk list belanja. Owner tetap tekan <b>Tambahkan ke Keranjang</b> dari Belanjaku.</div>
+      <div class="small" style="font-weight:800;line-height:1.45;margin-bottom:10px;color:#7c5f13">Barang tidak langsung masuk list belanja. Owner tetap tekan <b>Tambahkan Semua Warna</b> dari Belanjaku.</div>
       <div class="row">
         <button class="btn secondary" onclick="closeStoreEmptyStockModal()">Batal</button>
         <button class="btn gold" onclick="submitStoreEmptyStock()">Kirim</button>
@@ -1114,7 +1154,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
           <div style="min-width:0;flex:1">
             <div class="section-title" style="margin:0 0 3px;color:#7c5f13">📦 Barang Kosong Risma</div>
-            <b style="font-size:14px">Kirim nama barang + warna</b>
+            <b style="font-size:14px">Kirim 1 barang + multi warna</b>
             <div class="small" style="margin-top:2px;color:#7c5f13;font-weight:800">pengirimnya Risma</div>
           </div>
           <button class="btn gold" type="button" onclick="openStoreEmptyStockModal()" style="width:auto;min-width:100px;padding:10px;border-radius:13px">Laporkan</button>
@@ -1281,7 +1321,8 @@ const FIREBASE_CONFIG={
 const STAFF_DAILY_NOTE_DOC_ID='__staff_daily_home_note';
 const DEFAULT_STAFF_DAILY_NOTE='Semangat bekerja hari ini. Pastikan transaksi dicatat dengan benar dan refresh jika data belum masuk.';
 // Bridge ke aplikasi Belanjaku: Risma bisa lapor barang kosong (nama barang + warna) seperti staff.
-const BELANJAKU_BRIDGE_KEY='risma_to_belanjaku_barang_kosong_v1';
+const BELANJAKU_BRIDGE_KEY='toko_to_belanjaku_barang_kosong_v1';
+const BELANJAKU_BRIDGE_LEGACY_KEYS=['risma_to_belanjaku_barang_kosong_v1'];
 const BELANJAKU_SUPABASE_URL='https://phuzgriglgovzcwgbehr.supabase.co';
 const BELANJAKU_SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBodXpncmlnbGdvdnpjd2diZWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1OTQ3ODUsImV4cCI6MjA5NDE3MDc4NX0.gf-cfo8Vos8uYgZRHG0KUB4xMhXAld2oTYv-wNiKneE';
 const BELANJAKU_SUPABASE_ITEMS_TABLE='belanja_items';
@@ -1542,24 +1583,71 @@ function openTransactionModal(){const modal=$('transactionModal');$('inputDate')
 function closeTransactionModal(){const modal=$('transactionModal');modal.classList.add('hidden');clearKeyboardSafeModal(modal)}
 function cleanBelanjakuBridgeText(v){return String(v||'').replace(/[<>]/g,'').replace(/\s+/g,' ').trim()}
 function belanjakuBridgeSlug(v){return cleanBelanjakuBridgeText(v).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-.]/g,'').slice(0,70)||'item'}
-function getBelanjakuBridgeQueue(){try{const raw=JSON.parse(localStorage.getItem(BELANJAKU_BRIDGE_KEY)||'[]');return Array.isArray(raw)?raw.filter(Boolean):[]}catch(e){return []}}
-function setBelanjakuBridgeQueue(list){try{localStorage.setItem(BELANJAKU_BRIDGE_KEY,JSON.stringify((list||[]).slice(-250)))}catch(e){}}
+function getBelanjakuBridgeQueue(){
+  const keys=[BELANJAKU_BRIDGE_KEY,...(BELANJAKU_BRIDGE_LEGACY_KEYS||[])];
+  const out=[];
+  keys.forEach(key=>{
+    try{
+      const raw=JSON.parse(localStorage.getItem(key)||'[]');
+      if(Array.isArray(raw))out.push(...raw.filter(Boolean));
+    }catch(e){}
+  });
+  const seen=new Set();
+  return out.filter(item=>{
+    const id=String(item?.id||'');
+    if(!id||seen.has(id))return false;
+    seen.add(id);
+    return true;
+  });
+}
+function setBelanjakuBridgeQueue(list){
+  try{
+    localStorage.setItem(BELANJAKU_BRIDGE_KEY,JSON.stringify((list||[]).slice(-250)));
+    (BELANJAKU_BRIDGE_LEGACY_KEYS||[]).forEach(key=>localStorage.removeItem(key));
+  }catch(e){}
+}
 function saveBelanjakuBridgeQueue(item){const list=getBelanjakuBridgeQueue().filter(x=>String(x.id)!==String(item.id));list.push(item);setBelanjakuBridgeQueue(list)}
-function buildStoreBelanjakuEmptyItem({name,color,qty,supplier,note}){
+function normalizeStoreEmptyStockVariants(variants){
+  const list=Array.isArray(variants)&&variants.length?variants:[];
+  const merged=[];
+  const seen=new Map();
+  list.forEach(entry=>{
+    const isObj=entry&&typeof entry==='object';
+    const colorName=cleanBelanjakuBridgeText(isObj?(entry.colorName||entry.color||entry.name||entry.motif||''):entry);
+    if(!colorName)return;
+    const qtyRaw=isObj?(entry.qty||entry.quantity||entry.jumlah||1):1;
+    const qty=Math.max(1,Number(String(qtyRaw).replace(/\D/g,''))||1);
+    const key=colorName.toLowerCase();
+    if(seen.has(key)){
+      const existing=seen.get(key);
+      existing.qty+=qty;
+      existing.done=existing.done&&Boolean(isObj&&entry.done);
+    }else{
+      const variant={colorName,qty,done:Boolean(isObj&&entry.done)};
+      seen.set(key,variant);
+      merged.push(variant);
+    }
+  });
+  return merged;
+}
+function buildStoreBelanjakuEmptyItem({name,color,qty,supplier,note,variants}){
   const now=Date.now(), nowISO=new Date(now).toISOString();
-  const cleanName=cleanBelanjakuBridgeText(name), cleanColor=cleanBelanjakuBridgeText(color), cleanSupplier=cleanBelanjakuBridgeText(supplier), cleanNote=cleanBelanjakuBridgeText(note);
+  const cleanName=cleanBelanjakuBridgeText(name), cleanSupplier=cleanBelanjakuBridgeText(supplier), cleanNote=cleanBelanjakuBridgeText(note);
+  const cleanVariants=normalizeStoreEmptyStockVariants(Array.isArray(variants)&&variants.length?variants:[{colorName:color,qty}]);
+  const totalQty=cleanVariants.reduce((sum,v)=>sum+(Number(v.qty)||0),0);
+  const variantInfo=cleanVariants.length>1?` (${cleanVariants.length} warna, ${totalQty} pcs)`:'';
   const id='risma_empty_'+belanjakuBridgeSlug(cleanName)+'_'+now+'_'+Math.random().toString(36).slice(2,7);
   return {
     id,
     name:cleanName,
     supplierName:cleanSupplier,
     kodiPrice:0,
-    variants:[{colorName:cleanColor,qty:Math.max(1,Number(qty)||1),done:false}],
+    variants:cleanVariants,
     unit:'pcs',
     priority:'Tinggi',
-    note:cleanNote?`Dari Risma: ${cleanNote}`:'Dari Risma - barang kosong',
+    note:cleanNote?`Dari Risma${variantInfo}: ${cleanNote}`:`Dari Risma - barang kosong${variantInfo}`,
     done:false,
-    source:'stafku_barang_kosong',
+    source:'toko_barang_kosong',
     staffStatus:'inbox',
     staffRequest:true,
     createdBy:'risma',
@@ -1590,25 +1678,71 @@ async function syncBelanjakuBridgeQueue(){
   setBelanjakuBridgeQueue(remaining);
   return {sent,remaining:remaining.length};
 }
+function renumberStoreEmptyStockVariantRows(){
+  const list=$('storeEmptyStockVariantList');
+  if(!list)return;
+  const rows=[...list.querySelectorAll('.store-empty-variant-row')];
+  rows.forEach((row,index)=>{
+    row.classList.toggle('only-one',rows.length<=1);
+    const color=row.querySelector('[data-empty-color]');
+    const qty=row.querySelector('[data-empty-qty]');
+    if(color)color.placeholder=`Warna ${index+1}, contoh: Milo`;
+    if(qty)qty.placeholder='Qty';
+  });
+}
+function addStoreEmptyStockVariantRow(color='',qty=1){
+  const list=$('storeEmptyStockVariantList');
+  if(!list)return null;
+  const row=document.createElement('div');
+  row.className='store-empty-variant-row';
+  row.innerHTML=`<input type="text" data-empty-color autocomplete="off" placeholder="Warna / motif"><input class="store-empty-qty" type="tel" inputmode="numeric" pattern="[0-9]*" data-empty-qty value="1" placeholder="Qty"><button type="button" class="store-empty-remove-color" onclick="removeStoreEmptyStockVariantRow(this)" aria-label="Hapus warna">×</button>`;
+  list.appendChild(row);
+  const colorInput=row.querySelector('[data-empty-color]');
+  const qtyInput=row.querySelector('[data-empty-qty]');
+  if(colorInput)colorInput.value=cleanBelanjakuBridgeText(color);
+  if(qtyInput)qtyInput.value=String(Math.max(1,Number(qty)||1));
+  renumberStoreEmptyStockVariantRows();
+  setTimeout(()=>{colorInput?.focus();focusKeyboardSafeInput(colorInput);},30);
+  return row;
+}
+function removeStoreEmptyStockVariantRow(btn){
+  const list=$('storeEmptyStockVariantList');
+  const row=btn?.closest?.('.store-empty-variant-row');
+  if(row)row.remove();
+  if(list&&!list.querySelector('.store-empty-variant-row'))addStoreEmptyStockVariantRow();
+  renumberStoreEmptyStockVariantRows();
+}
+function getStoreEmptyStockVariants(){
+  const list=$('storeEmptyStockVariantList');
+  if(!list)return [];
+  return normalizeStoreEmptyStockVariants([...list.querySelectorAll('.store-empty-variant-row')].map(row=>({
+    colorName:row.querySelector('[data-empty-color]')?.value,
+    qty:row.querySelector('[data-empty-qty]')?.value,
+    done:false
+  })));
+}
 function openStoreEmptyStockModal(){
   const modal=$('storeEmptyStockModal');
   if(!modal)return showToast('Form barang kosong belum siap');
-  ['storeEmptyStockName','storeEmptyStockColor','storeEmptyStockSupplier','storeEmptyStockNote'].forEach(id=>{const el=$(id);if(el)el.value=''});
-  if($('storeEmptyStockQty'))$('storeEmptyStockQty').value='1';
+  ['storeEmptyStockName','storeEmptyStockSupplier','storeEmptyStockNote'].forEach(id=>{const el=$(id);if(el)el.value=''});
+  const variantList=$('storeEmptyStockVariantList');
+  if(variantList)variantList.innerHTML='';
+  addStoreEmptyStockVariantRow('',1);
   modal.classList.remove('hidden');
   prepareKeyboardSafeModal(modal);
   setTimeout(()=>{const target=$('storeEmptyStockName');target?.focus();focusKeyboardSafeInput(target);},80);
 }
 function closeStoreEmptyStockModal(){const modal=$('storeEmptyStockModal');if(modal){modal.classList.add('hidden');clearKeyboardSafeModal(modal)}}
 async function submitStoreEmptyStock(){
-  const name=cleanBelanjakuBridgeText($('storeEmptyStockName')?.value), color=cleanBelanjakuBridgeText($('storeEmptyStockColor')?.value);
+  const name=cleanBelanjakuBridgeText($('storeEmptyStockName')?.value);
+  const variants=getStoreEmptyStockVariants();
   if(!name)return showToast('Nama barang wajib diisi');
-  if(!color)return showToast('Warna wajib diisi');
-  const qty=Math.max(1,Number(String($('storeEmptyStockQty')?.value||'').replace(/\D/g,''))||1);
-  const item=buildStoreBelanjakuEmptyItem({name,color,qty,supplier:$('storeEmptyStockSupplier')?.value,note:$('storeEmptyStockNote')?.value});
+  if(!variants.length)return showToast('Minimal isi 1 warna');
+  const item=buildStoreBelanjakuEmptyItem({name,variants,supplier:$('storeEmptyStockSupplier')?.value,note:$('storeEmptyStockNote')?.value});
   saveBelanjakuBridgeQueue(item);
   closeStoreEmptyStockModal();
-  showToast('Barang kosong dari Risma disiapkan untuk Belanjaku');
+  const totalQty=variants.reduce((sum,v)=>sum+(Number(v.qty)||0),0);
+  showToast(`${variants.length} warna / ${totalQty} pcs disiapkan untuk Belanjaku`);
   const result=await syncBelanjakuBridgeQueue();
   if(result.sent>0)showToast('Barang kosong Risma masuk ke halaman Kiriman Staff Belanjaku');
   else showToast('Tersimpan lokal, buka Belanjaku lalu refresh');
